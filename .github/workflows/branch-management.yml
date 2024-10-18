@@ -34,7 +34,8 @@ jobs:
 
             // branch-status.jsonを読み込み
             let branchStatus = {};
-            if (fs.existsSync(branchStatusJsonName)) {
+            if (fs.existsSync(branchStatusJsonName))
+            {
               branchStatus = JSON.parse(fs.readFileSync(branchStatusJsonName, 'utf8'));
             }
 
@@ -45,24 +46,28 @@ jobs:
 
               let shouldMerge = false;
               // 現在の日時がマージスケジュールと一致するか確認
-              for (const scheduledTime of schedule) {
+              for (const scheduledTime of schedule)
+              {
                 const scheduledDate = new Date(scheduledTime);
 
-                if (isNaN(scheduledDate)) {
+                if (isNaN(scheduledDate))
+                {
                   console.log(`Invalid scheduledTime: ${scheduledTime}`);
                   continue;
                 }
 
                 const timeDiff = currentTime.getTime() - scheduledDate.getTime();
 
-                if (0 <= timeDiff && timeDiff < 60 * 60 * 1000) {
+                if (0 <= timeDiff && timeDiff < 60 * 60 * 1000)
+                {
                   // 1時間以内
                   shouldMerge = true;
                   break;
                 }
               }
 
-              if (!shouldMerge) {
+              if (!shouldMerge)
+              {
                 continue;
               }
 
@@ -99,8 +104,12 @@ jobs:
                     });
 
                     console.log(`Deleted old branch ${existingBranch}`);
-                  } catch (error) {
+                  }
+                  catch (error)
+                  {
                     console.error(`Failed to merge or delete branch ${existingBranch}: ${error.message}`);
+
+                    throw error;
                   }
                 }
               }
@@ -110,7 +119,8 @@ jobs:
               const newBranchName = `${baseName}/feature-${mmdd}`;
 
               // mainから新しいブランチを作成
-              try {
+              try
+              {
                 const { data: mainRef } = await github.rest.git.getRef({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
@@ -127,33 +137,28 @@ jobs:
                 console.log(`Created new branch ${newBranchName}`);
 
                 // branchStatusにbasenameが存在しない場合は新規作成
-                if (!branchStatus[baseName]) {
+                if (!branchStatus[baseName])
+                {
                   branchStatus[baseName] = {
                     branch_name: newBranchName,
                     created_at: currentTime.toISOString()
                   };
                 }
-                else {
+                else
+                {
                   branchStatus[baseName].branch_name = newBranchName;
                   branchStatus[baseName].created_at = currentTime.toISOString();
                 }
-              } catch (error) {
+              }
+              catch (error)
+              {
                 console.error(`Failed to create new branch ${newBranchName}: ${error.message}`);
+
+                throw error;
               }
 
               try
               {
-                // 新しいブランチにチェックアウト
-                await github.rest.git.updateRef({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  ref: 'heads/main',
-                  sha: newBranchName,
-                  force: true
-                });
-
-                console.log(`Checked out to ${newBranchName}`);
-
                 // branch-status.jsonを更新
                 fs.writeFileSync(branchStatusJsonName, JSON.stringify(branchStatus, null, 2));
 
@@ -199,8 +204,11 @@ jobs:
 
                 console.log(`Committed and pushed ${branchStatusJsonName} to ${newBranchName}`);
               }
-              catch (error) {
+              catch (error)
+              {
                 console.error(`Failed to commit ${branchStatusJsonName}: ${error.message}`);
+
+                throw error;
               }
             }
 
