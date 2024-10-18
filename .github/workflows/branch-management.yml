@@ -28,6 +28,7 @@ jobs:
             const config = yaml.load(fs.readFileSync('config.yaml', 'utf8'));
 
             const currentTime = new Date();
+            console.log(`Current time: ${currentTime.toISOString()}`);
 
             for (const branchConfig of config.branches)
             {
