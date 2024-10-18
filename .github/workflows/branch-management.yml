@@ -26,7 +26,7 @@ jobs:
             const fs = require('fs');
             const yaml = require('js-yaml');
 
-            const branchStatusJsonName = 'branch-status.yaml';
+            const branchStatusJsonPath = 'branch-status.yaml';
             const config = yaml.load(fs.readFileSync('config.yaml', 'utf8'));
 
             const currentTime = new Date();
@@ -115,18 +115,18 @@ jobs:
               ref: 'heads/main'
             });
 
-            // branch-status.yamlを読み込み
-            let oldBranchStatus = {};
-            if (fs.existsSync(branchStatusJsonName))
-            {
-              oldBranchStatus = yaml.load(fs.readFileSync(branchStatusJsonName, 'utf8'));
-            }
+            const { data: fileContent } = await github.rest.repos.getContent({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              path: branchStatusJsonPath,
+              ref: mainRef.object.sha
+            });
 
             for (const branchConfig of config.branches)
             {
               const baseName = branchConfig.name;
 
-              const newBranchStatus = JSON.parse(JSON.stringify(oldBranchStatus));
+              const branchStatus = yaml.load(Buffer.from(fileContent.content, 'base64').toString('utf-8'));
 
               // 新しい日付でブランチを作成
               const mmdd = ("0" + (currentTime.getMonth() + 1)).slice(-2) + ("0" + currentTime.getDate()).slice(-2);
@@ -144,18 +144,18 @@ jobs:
 
                 console.log(`Created new branch ${newBranchName}`);
 
-                // newBranchStatusにbasenameが存在しない場合は新規作成
-                if (!newBranchStatus[baseName])
+                // branchStatusにbasenameが存在しない場合は新規作成
+                if (!branchStatus[baseName])
                 {
-                  newBranchStatus[baseName] = {
+                  branchStatus[baseName] = {
                     branch_name: newBranchName,
                     created_at: currentTime.toISOString()
                   };
                 }
                 else
                 {
-                  newBranchStatus[baseName].branch_name = newBranchName;
-                  newBranchStatus[baseName].created_at = currentTime.toISOString();
+                  branchStatus[baseName].branch_name = newBranchName;
+                  branchStatus[baseName].created_at = currentTime.toISOString();
                 }
               }
               catch (error)
@@ -168,9 +168,9 @@ jobs:
               try
               {
                 // branch-status.yamlを更新
-                fs.writeFileSync(branchStatusJsonName, yaml.dump(newBranchStatus));
+                fs.writeFileSync(branchStatusJsonPath, yaml.dump(branchStatus));
 
-                console.log('Updated ${branchStatusJsonName}');
+                console.log('Updated ${branchStatusJsonPath}');
 
                 // 新しいブランチに対してbranch-status.yamlをコミット
                 const { data: latestCommit } = await github.rest.repos.getCommit({
@@ -181,10 +181,10 @@ jobs:
 
                 const treeItems = [
                   {
-                    path: branchStatusJsonName,
+                    path: branchStatusJsonPath,
                     mode: '100644',
                     type: 'blob',
-                    content: fs.readFileSync(branchStatusJsonName, 'utf8')
+                    content: fs.readFileSync(branchStatusJsonPath, 'utf8')
                   }
                 ];
 
@@ -198,7 +198,7 @@ jobs:
                 const { data: newCommit } = await github.rest.git.createCommit({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  message: `Update ${branchStatusJsonName}`,
+                  message: `Update ${branchStatusJsonPath}`,
                   tree: newTree.sha,
                   parents: [latestCommit.sha]
                 });
@@ -210,11 +210,11 @@ jobs:
                   sha: newCommit.sha
                 });
 
-                console.log(`Committed and pushed ${branchStatusJsonName} to ${newBranchName}`);
+                console.log(`Committed and pushed ${branchStatusJsonPath} to ${newBranchName}`);
               }
               catch (error)
               {
-                console.error(`Failed to commit ${branchStatusJsonName}: ${error.message}`);
+                console.error(`Failed to commit ${branchStatusJsonPath}: ${error.message}`);
 
                 throw error;
               }
