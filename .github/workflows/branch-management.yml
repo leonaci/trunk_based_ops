@@ -26,6 +26,7 @@ jobs:
             const fs = require('fs');
             const yaml = require('js-yaml');
 
+            const branchStatusJsonName = 'branch-status.json';
             const config = yaml.load(fs.readFileSync('config.yaml', 'utf8'));
 
             const currentTime = new Date();
@@ -33,8 +34,8 @@ jobs:
 
             // branch-status.jsonを読み込み
             let branchStatus = {};
-            if (fs.existsSync('branch-status.json')) {
-              branchStatus = JSON.parse(fs.readFileSync('branch-status.json', 'utf8'));
+            if (fs.existsSync(branchStatusJsonName)) {
+              branchStatus = JSON.parse(fs.readFileSync(branchStatusJsonName, 'utf8'));
             }
 
             for (const branchConfig of config.branches)
@@ -139,64 +140,67 @@ jobs:
               } catch (error) {
                 console.error(`Failed to create new branch ${newBranchName}: ${error.message}`);
               }
+
+              try
+              {
+                // 新しいブランチにチェックアウト
+                await github.rest.git.updateRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: 'heads/main',
+                  sha: newBranchName,
+                  force: true
+                });
+
+                console.log(`Checked out to ${newBranchName}`);
+
+                // branch-status.jsonを更新
+                fs.writeFileSync(branchStatusJsonName, JSON.stringify(branchStatus, null, 2));
+
+                console.log('Updated branch-status.json');
+
+                // branch-status.jsonをコミットしてプッシュ
+                const { data: latestCommit } = await github.rest.repos.getCommit({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: 'heads/main'
+                });
+
+                const treeItems = [
+                  {
+                    path: branchStatusJsonName,
+                    mode: '100644',
+                    type: 'blob',
+                    content: fs.readFileSync(branchStatusJsonName, 'utf8')
+                  }
+                ];
+
+                const { data: newTree } = await github.rest.git.createTree({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  tree: treeItems,
+                  base_tree: latestCommit.commit.tree.sha
+                });
+
+                const { data: newCommit } = await github.rest.git.createCommit({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  message: 'Update branch-status.json',
+                  tree: newTree.sha,
+                  parents: [latestCommit.sha]
+                });
+
+                await github.rest.git.updateRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: 'heads/${newBranchName}',
+                  sha: newCommit.sha
+                });
+
+                console.log('Updated branch-status.json on main branch');
+              }
+              catch (error) {
+                console.error(`Failed to commit branch-status.json: ${error.message}`);
+              }
             }
 
-            // branch-status.jsonを更新
-            fs.writeFileSync('branch-status.json', JSON.stringify(branchStatus, null, 2));
-
-            try
-            {
-              // 新しいブランチにチェックアウト
-              await github.rest.git.updateRef({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                ref: 'heads/main',
-                sha: newBranchName,
-                force: true
-              });
-
-              console.log(`Checked out to ${newBranchName}`);
-
-              // branch-status.jsonをコミットしてプッシュ
-              const { data: latestCommit } = await github.rest.repos.getCommit({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                ref: 'heads/main'
-              });
-
-              const treeItems = [
-                {
-                  path: 'branch-status.json',
-                  mode: '100644',
-                  type: 'blob',
-                  content: fs.readFileSync('branch-status.json', 'utf8')
-                }
-              ];
-
-              const { data: newTree } = await github.rest.git.createTree({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                tree: treeItems,
-                base_tree: latestCommit.commit.tree.sha
-              });
-
-              const { data: newCommit } = await github.rest.git.createCommit({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                message: 'Update branch-status.json',
-                tree: newTree.sha,
-                parents: [latestCommit.sha]
-              });
-
-              await github.rest.git.updateRef({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                ref: 'heads/${newBranchName}',
-                sha: newCommit.sha
-              });
-
-              console.log('Updated branch-status.json on main branch');
-            }
-            catch (error) {
-              console.error(`Failed to commit branch-status.json: ${error.message}`);
-            }
