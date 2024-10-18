@@ -106,6 +106,18 @@ jobs:
                   }
                 }
               }
+            }
+
+            // mainの最新のコミットを取得
+            const { data: mainRef } = await github.rest.git.getRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'heads/main'
+            });
+
+            for (const branchConfig of config.branches)
+            {
+              const baseName = branchConfig.name;
 
               // branch-status.yamlを読み込み
               let branchStatus = {};
@@ -121,12 +133,6 @@ jobs:
               // mainから新しいブランチを作成
               try
               {
-                const { data: mainRef } = await github.rest.git.getRef({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  ref: 'heads/main'
-                });
-
                 await github.rest.git.createRef({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
