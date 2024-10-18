@@ -26,7 +26,7 @@ jobs:
             const fs = require('fs');
             const yaml = require('js-yaml');
 
-            const branchStatusJsonName = 'branch-status.json';
+            const branchStatusJsonName = 'branch-status.yaml';
             const config = yaml.load(fs.readFileSync('config.yaml', 'utf8'));
 
             const currentTime = new Date();
@@ -107,11 +107,11 @@ jobs:
                 }
               }
 
-              // branch-status.jsonを読み込み
+              // branch-status.yamlを読み込み
               let branchStatus = {};
               if (fs.existsSync(branchStatusJsonName))
               {
-                branchStatus = JSON.parse(fs.readFileSync(branchStatusJsonName, 'utf8'));
+                branchStatus = yaml.load(fs.readFileSync(branchStatusJsonName, 'utf8'));
               }
 
               // 新しい日付でブランチを作成
@@ -159,12 +159,12 @@ jobs:
 
               try
               {
-                // branch-status.jsonを更新
-                fs.writeFileSync(branchStatusJsonName, JSON.stringify(branchStatus, null, 2));
+                // branch-status.yamlを更新
+                fs.writeFileSync(branchStatusJsonName, yaml.dump(branchStatus));
 
                 console.log('Updated ${branchStatusJsonName}');
 
-                // 新しいブランチに対してbranch-status.jsonをコミット
+                // 新しいブランチに対してbranch-status.yamlをコミット
                 const { data: latestCommit } = await github.rest.repos.getCommit({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
