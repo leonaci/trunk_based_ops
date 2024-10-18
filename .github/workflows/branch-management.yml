@@ -46,7 +46,7 @@ jobs:
                   continue;
                 }
 
-                const diffTime = currentTime.getTime() - scheduledDate.getTime();
+                const timeDiff = currentTime.getTime() - scheduledDate.getTime();
 
                 if (0 <= timeDiff && timeDiff < 60 * 60 * 1000)
                 {
