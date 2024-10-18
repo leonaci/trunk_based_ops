@@ -32,13 +32,6 @@ jobs:
             const currentTime = new Date();
             console.log(`Current time: ${currentTime.toISOString()}`);
 
-            // branch-status.jsonを読み込み
-            let branchStatus = {};
-            if (fs.existsSync(branchStatusJsonName))
-            {
-              branchStatus = JSON.parse(fs.readFileSync(branchStatusJsonName, 'utf8'));
-            }
-
             for (const branchConfig of config.branches)
             {
               const baseName = branchConfig.name;
@@ -112,6 +105,13 @@ jobs:
                     throw error;
                   }
                 }
+              }
+
+              // branch-status.jsonを読み込み
+              let branchStatus = {};
+              if (fs.existsSync(branchStatusJsonName))
+              {
+                branchStatus = JSON.parse(fs.readFileSync(branchStatusJsonName, 'utf8'));
               }
 
               // 新しい日付でブランチを作成
