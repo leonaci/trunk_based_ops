@@ -170,7 +170,7 @@ jobs:
                 // branch-status.yamlを更新
                 fs.writeFileSync(branchStatusJsonPath, yaml.dump(branchStatus));
 
-                console.log('Updated ${branchStatusJsonPath}');
+                console.log(`Updated ${branchStatusJsonPath}`);
 
                 // 新しいブランチに対してbranch-status.yamlをコミット
                 const { data: latestCommit } = await github.rest.repos.getCommit({
