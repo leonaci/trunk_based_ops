@@ -21,12 +21,11 @@ jobs:
       - name: Branch Management Script
         uses: actions/github-script@v6
         with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
             const yaml = require('js-yaml');
             const config = yaml.load(fs.readFileSync('config.yaml', 'utf8'));
-
-            const { owner, repo } = github.context.repo;
 
             const currentTime = new Date();
 
@@ -63,8 +62,8 @@ jobs:
               }
 
               const { data: branches } = await github.rest.repos.listBranches({
-                owner,
-                repo,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
                 per_page: 100
               });
 
@@ -80,8 +79,8 @@ jobs:
                   // ブランチをmainにマージ
                   try {
                     await github.rest.repos.merge({
-                      owner,
-                      repo,
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
                       base: 'main',
                       head: existingBranch,
                       commit_message: `Merging ${existingBranch} into main`
@@ -91,8 +90,8 @@ jobs:
 
                     // 古いブランチを削除（オプション）
                     await github.rest.git.deleteRef({
-                      owner,
-                      repo,
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
                       ref: `heads/${existingBranch}`
                     });
 
@@ -109,14 +108,14 @@ jobs:
 
               // mainから新しいブランチを作成
               const { data: mainRef } = await github.rest.git.getRef({
-                owner,
-                repo,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
                 ref: 'heads/main'
               });
 
               await github.rest.git.createRef({
-                owner,
-                repo,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
                 ref: `refs/heads/${newBranchName}`,
                 sha: mainRef.object.sha
               });
