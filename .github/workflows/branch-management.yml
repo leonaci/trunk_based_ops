@@ -18,17 +18,24 @@ jobs:
 
       - run: npm install js-yaml
 
-      - name: Branch Management Script
+      - name: Manage Branch Lifetime
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
             const yaml = require('js-yaml');
+
             const config = yaml.load(fs.readFileSync('config.yaml', 'utf8'));
 
             const currentTime = new Date();
             console.log(`Current time: ${currentTime.toISOString()}`);
+
+            // branch-status.jsonを読み込み
+            let branchStatus = {};
+            if (fs.existsSync('branch-status.json')) {
+              branchStatus = JSON.parse(fs.readFileSync('branch-status.json', 'utf8'));
+            }
 
             for (const branchConfig of config.branches)
             {
@@ -37,28 +44,24 @@ jobs:
 
               let shouldMerge = false;
               // 現在の日時がマージスケジュールと一致するか確認
-              for (const scheduledTime of schedule)
-              {
+              for (const scheduledTime of schedule) {
                 const scheduledDate = new Date(scheduledTime);
 
-                if (isNaN(scheduledDate))
-                {
+                if (isNaN(scheduledDate)) {
                   console.log(`Invalid scheduledTime: ${scheduledTime}`);
                   continue;
                 }
 
                 const timeDiff = currentTime.getTime() - scheduledDate.getTime();
 
-                if (0 <= timeDiff && timeDiff < 60 * 60 * 1000)
-                {
+                if (0 <= timeDiff && timeDiff < 60 * 60 * 1000) {
                   // 1時間以内
                   shouldMerge = true;
                   break;
                 }
               }
 
-              if (!shouldMerge)
-              {
+              if (!shouldMerge) {
                 continue;
               }
 
@@ -71,10 +74,8 @@ jobs:
               const branchPattern = new RegExp(`^${baseName}/feature-(\\d{4})$`);
 
               // パターンに一致するブランチをすべてマージ
-              for (const branch of branches)
-              {
-                if (branch.name.match(branchPattern))
-                {
+              for (const branch of branches) {
+                if (branch.name.match(branchPattern)) {
                   const existingBranch = branch.name;
 
                   // ブランチをmainにマージ
@@ -108,18 +109,83 @@ jobs:
               const newBranchName = `${baseName}/feature-${mmdd}`;
 
               // mainから新しいブランチを作成
-              const { data: mainRef } = await github.rest.git.getRef({
+              try {
+                const { data: mainRef } = await github.rest.git.getRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: 'heads/main'
+                });
+
+                await github.rest.git.createRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: `refs/heads/${newBranchName}`,
+                  sha: mainRef.object.sha
+                });
+
+                console.log(`Created new branch ${newBranchName}`);
+
+                // branchStatusにbasenameが存在しない場合は新規作成
+                if (!branchStatus[baseName]) {
+                  branchStatus[baseName] = {
+                    branch_name: newBranchName,
+                    created_at: currentTime.toISOString()
+                  };
+                }
+                else {
+                  branchStatus[baseName].branch_name = newBranchName;
+                  branchStatus[baseName].created_at = currentTime.toISOString();
+                }
+              } catch (error) {
+                console.error(`Failed to create new branch ${newBranchName}: ${error.message}`);
+              }
+            }
+
+            // branch-status.jsonを更新
+            fs.writeFileSync('branch-status.json', JSON.stringify(branchStatus, null, 2));
+
+            try
+            {
+              // branch-status.jsonをコミットしてプッシュ
+              const { data: latestCommit } = await github.rest.repos.getCommit({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 ref: 'heads/main'
               });
 
-              await github.rest.git.createRef({
+              const treeItems = [
+                {
+                  path: 'branch-status.json',
+                  mode: '100644',
+                  type: 'blob',
+                  content: fs.readFileSync('branch-status.json', 'utf8')
+                }
+              ];
+
+              const { data: newTree } = await github.rest.git.createTree({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                ref: `refs/heads/${newBranchName}`,
-                sha: mainRef.object.sha
+                tree: treeItems,
+                base_tree: latestCommit.commit.tree.sha
               });
 
-              console.log(`Created new branch ${newBranchName}`);
+              const { data: newCommit } = await github.rest.git.createCommit({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                message: 'Update branch-status.json',
+                tree: newTree.sha,
+                parents: [latestCommit.sha]
+              });
+
+              await github.rest.git.updateRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: 'heads/main',
+                sha: newCommit.sha
+              });
+
+              console.log('Updated branch-status.json on main branch');
+            }
+            catch (error) {
+              console.error(`Failed to commit branch-status.json: ${error.message}`);
             }
