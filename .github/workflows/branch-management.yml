@@ -115,16 +115,18 @@ jobs:
               ref: 'heads/main'
             });
 
+            // branch-status.yamlを読み込み
+            let oldBranchStatus = {};
+            if (fs.existsSync(branchStatusJsonName))
+            {
+              oldBranchStatus = yaml.load(fs.readFileSync(branchStatusJsonName, 'utf8'));
+            }
+
             for (const branchConfig of config.branches)
             {
               const baseName = branchConfig.name;
 
-              // branch-status.yamlを読み込み
-              let branchStatus = {};
-              if (fs.existsSync(branchStatusJsonName))
-              {
-                branchStatus = yaml.load(fs.readFileSync(branchStatusJsonName, 'utf8'));
-              }
+              const newBranchStatus = JSON.parse(JSON.stringify(oldBranchStatus));
 
               // 新しい日付でブランチを作成
               const mmdd = ("0" + (currentTime.getMonth() + 1)).slice(-2) + ("0" + currentTime.getDate()).slice(-2);
@@ -142,18 +144,18 @@ jobs:
 
                 console.log(`Created new branch ${newBranchName}`);
 
-                // branchStatusにbasenameが存在しない場合は新規作成
-                if (!branchStatus[baseName])
+                // newBranchStatusにbasenameが存在しない場合は新規作成
+                if (!newBranchStatus[baseName])
                 {
-                  branchStatus[baseName] = {
+                  newBranchStatus[baseName] = {
                     branch_name: newBranchName,
                     created_at: currentTime.toISOString()
                   };
                 }
                 else
                 {
-                  branchStatus[baseName].branch_name = newBranchName;
-                  branchStatus[baseName].created_at = currentTime.toISOString();
+                  newBranchStatus[baseName].branch_name = newBranchName;
+                  newBranchStatus[baseName].created_at = currentTime.toISOString();
                 }
               }
               catch (error)
@@ -166,7 +168,7 @@ jobs:
               try
               {
                 // branch-status.yamlを更新
-                fs.writeFileSync(branchStatusJsonName, yaml.dump(branchStatus));
+                fs.writeFileSync(branchStatusJsonName, yaml.dump(newBranchStatus));
 
                 console.log('Updated ${branchStatusJsonName}');
 
