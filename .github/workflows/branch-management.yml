@@ -1,0 +1,121 @@
+name: Branch Management
+
+on:
+  schedule:
+    - cron: '0 * * * *' # 毎時0分に実行
+
+jobs:
+  branch_management:
+    runs-on: [ self-hosted, Linux ]
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: Branch Management Script
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const yaml = require('js-yaml');
+            const config = yaml.load(fs.readFileSync('config.yaml', 'utf8'));
+
+            const { owner, repo } = github.context.repo;
+
+            const currentTime = new Date();
+
+            for (const branchConfig of config.branches)
+            {
+              const baseName = branchConfig.name;
+              const schedule = branchConfig.schedule;
+
+              let shouldMerge = false;
+              // 現在の日時がマージスケジュールと一致するか確認
+              for (const scheduledTime of schedule)
+              {
+                const scheduledDate = new Date(scheduledTime);
+
+                if (isNaN(scheduledDate))
+                {
+                  console.log(`Invalid scheduledTime: ${scheduledTime}`);
+                  continue;
+                }
+
+                const diffTime = currentTime.getTime() - scheduledDate.getTime();
+
+                if (0 <= timeDiff && timeDiff < 60 * 60 * 1000)
+                {
+                  // 1時間以内
+                  shouldMerge = true;
+                  break;
+                }
+              }
+
+              if (!shouldMerge)
+              {
+                continue;
+              }
+
+              const { data: branches } = await github.rest.repos.listBranches({
+                owner,
+                repo,
+                per_page: 100
+              });
+
+              const branchPattern = new RegExp(`^${baseName}/feature-(\\d{4})$`);
+
+              // パターンに一致するブランチをすべてマージ
+              for (const branch of branches)
+              {
+                if (branch.name.match(branchPattern))
+                {
+                  const existingBranch = branch.name;
+
+                  // ブランチをmainにマージ
+                  try {
+                    await github.rest.repos.merge({
+                      owner,
+                      repo,
+                      base: 'main',
+                      head: existingBranch,
+                      commit_message: `Merging ${existingBranch} into main`
+                    });
+
+                    console.log(`Merged ${existingBranch} into main`);
+
+                    // 古いブランチを削除（オプション）
+                    await github.rest.git.deleteRef({
+                      owner,
+                      repo,
+                      ref: `heads/${existingBranch}`
+                    });
+
+                    console.log(`Deleted old branch ${existingBranch}`);
+                  } catch (error) {
+                    console.error(`Failed to merge or delete branch ${existingBranch}: ${error.message}`);
+                  }
+                }
+              }
+
+              // 新しい日付でブランチを作成
+              const mmdd = ("0" + (currentTime.getMonth() + 1)).slice(-2) + ("0" + currentTime.getDate()).slice(-2);
+              const newBranchName = `${baseName}/feature-${mmdd}`;
+
+              // mainから新しいブランチを作成
+              const { data: mainRef } = await github.rest.git.getRef({
+                owner,
+                repo,
+                ref: 'heads/main'
+              });
+
+              await github.rest.git.createRef({
+                owner,
+                repo,
+                ref: `refs/heads/${newBranchName}`,
+                sha: mainRef.object.sha
+              });
+
+              console.log(`Created new branch ${newBranchName}`);
+            }
+
+          pre-run: |
+            npm install js-yaml
