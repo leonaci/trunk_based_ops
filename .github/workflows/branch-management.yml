@@ -10,8 +10,14 @@ jobs:
   branch_management:
     runs-on: [ self-hosted, Linux ]
     steps:
-      - name: リポジトリをチェックアウト
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - run: npm install js-yaml
 
       - name: Branch Management Script
         uses: actions/github-script@v6
@@ -118,6 +124,3 @@ jobs:
 
               console.log(`Created new branch ${newBranchName}`);
             }
-
-          pre-run: |
-            npm install js-yaml
