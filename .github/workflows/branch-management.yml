@@ -146,6 +146,17 @@ jobs:
 
             try
             {
+              // 新しいブランチにチェックアウト
+              await github.rest.git.updateRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: 'heads/main',
+                sha: newBranchName,
+                force: true
+              });
+
+              console.log(`Checked out to ${newBranchName}`);
+
               // branch-status.jsonをコミットしてプッシュ
               const { data: latestCommit } = await github.rest.repos.getCommit({
                 owner: context.repo.owner,
@@ -180,7 +191,7 @@ jobs:
               await github.rest.git.updateRef({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                ref: 'heads/main',
+                ref: 'heads/${newBranchName}',
                 sha: newCommit.sha
               });
 
