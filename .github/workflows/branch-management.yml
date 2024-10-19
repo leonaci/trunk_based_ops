@@ -123,10 +123,17 @@ jobs:
       }}
     outputs:
       merged_base_names: ${{ steps.merge_branches.outputs.merged_base_names }}
+      failed_base_names: ${{ steps.merge_branches.outputs.failed_base_names }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm install js-yaml
 
       - name: Merge Branches Sequentially
         id: merge_branches
@@ -145,6 +152,7 @@ jobs:
           git pull origin main
 
           MERGED_BASE_NAMES=()
+          FAILED_BASE_NAMES=()
 
           for BRANCH in $BRANCHES; do
             echo ""
@@ -170,6 +178,7 @@ jobs:
               echo "Merge conflict when merging $BRANCH into main. Aborting merge."
 
               git merge --abort
+              FAILED_BASE_NAMES+=("$BASE_NAME")
             fi
           done
 
@@ -179,8 +188,72 @@ jobs:
             echo "merged_base_names=$(printf '%s\n' "${MERGED_BASE_NAMES[@]}" | jq -R | jq -s | jq -c 'unique')" >> $GITHUB_OUTPUT
           fi
 
+          if [ ${#FAILED_BASE_NAMES[@]} -eq 0 ]; then
+            echo "failed_base_names=[]" >> $GITHUB_OUTPUT
+          else
+            echo "failed_base_names=$(printf '%s\n' "${FAILED_BASE_NAMES[@]}" | jq -R | jq -s | jq -c 'unique')" >> $GITHUB_OUTPUT
+          fi
+
       - run: |
           echo "Merged base names: ${{ steps.merge_branches.outputs.merged_base_names }}"
+          echo "Failed base names: ${{ steps.merge_branches.outputs.failed_base_names }}"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Schedule Retry for Failed Branches
+        if: |
+          ${{
+            needs.merge_old_branches.outputs.failed_base_names && fromJson(needs.merge_old_branches.outputs.failed_base_names).length > 0
+          }}
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const yaml = require('js-yaml');
+            const path = 'config.yaml';
+
+            // config.yaml を読み込む
+            let config = {};
+            if (fs.existsSync(path))
+            {
+              config = yaml.load(fs.readFileSync(path, 'utf8'));
+            }
+            else
+            {
+              throw new Error('config.yaml が存在しません。');
+            }
+
+            const failedBaseNames = JSON.parse('${{ needs.merge_old_branches.outputs.failed_base_names }}');
+
+            const currentTime = new Date();
+            const oneHourLater = new Date(currentTime.getTime() - (currentTime.getTime() % (60 * 60 * 1000)) + 60 * 60 * 1000).toISOString();
+
+            for (const baseName of failedBaseNames)
+            {
+              for (const branchConfig of config.branches)
+              {
+                if (branchConfig.name === baseName)
+                {
+                  branchConfig.schedule.push(oneHourLater);
+                  console.log(`Scheduled retry for ${baseName} at ${oneHourLater}`);
+                }
+              }
+            }
+
+      - name: Commit and push config.yaml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "
+
+          git add config.yaml
+          git commit -m "Schedule retry for failed branches"
+          git push origin main
 
   extract_new_branches:
     needs: [ merge_old_branches ]
@@ -404,14 +477,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          #!/bin/bash
-          set -e
-
           BRANCH="${{ matrix.branch }}"
+
           git add branch-status.yaml
           git commit -m "Update branch-status.yaml for $BRANCH"
-
-          # ブランチと変更をプッシュ
           git push origin "$BRANCH"
 
   delete_lock:
