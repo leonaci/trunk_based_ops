@@ -282,7 +282,7 @@ jobs:
           git config user.email "actions@github.com"
 
           git add config.yaml
-          git commit -m "Schedule retry for failed branches" || echo "No changes to commit"
+          git commit -m "Update config.yaml for re-scheduling" || echo "No changes to commit"
           git push origin main
 
   extract_new_branches:
