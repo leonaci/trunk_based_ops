@@ -174,9 +174,9 @@ jobs:
 
           # 出力用にJSON配列に変換
           if [ ${#FAILED_BASE_NAMES[@]} -eq 0 ]; then
-            echo "failed_base_names=[]" >> $GITHUB_ENV
+            echo "failed_base_names=[]" >> $GITHUB_OUTPUT
           else
-            echo "failed_base_names=$(echo "${FAILED_BASE_NAMES[@]}" | jq -R . | jq -s .)" >> $GITHUB_ENV
+            echo "failed_base_names=$(echo "${FAILED_BASE_NAMES[@]}" | jq -R . | jq -s .)" >> $GITHUB_OUTPUT
           fi
 
       - run: |
