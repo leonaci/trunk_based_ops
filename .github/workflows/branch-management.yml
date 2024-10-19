@@ -206,7 +206,7 @@ jobs:
       - name: Schedule Retry for Failed Branches
         if: |
           ${{
-            needs.merge_old_branches.outputs.failed_base_names && fromJson(needs.merge_old_branches.outputs.failed_base_names).length > 0
+            steps.merge_branches.outputs.failed_base_names && fromJson(steps.merge_branches.outputs.failed_base_names).length > 0
           }}
         uses: actions/github-script@v6
         with:
@@ -227,8 +227,7 @@ jobs:
               throw new Error('config.yaml が存在しません。');
             }
 
-            console.log(`Failed base names: ${{ needs.merge_old_branches.outputs.failed_base_names }}`);
-            const failedBaseNames = JSON.parse('${{ needs.merge_old_branches.outputs.failed_base_names }}');
+            const failedBaseNames = JSON.parse('${{ steps.merge_branches.outputs.failed_base_names }}');
 
             const currentTime = new Date();
             const oneHourLater = new Date(currentTime.getTime() - (currentTime.getTime() % (60 * 60 * 1000)) + 60 * 60 * 1000).toISOString();
