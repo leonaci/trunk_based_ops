@@ -122,7 +122,7 @@ jobs:
         needs.extract_old_branches.outputs.old_branches && fromJson(needs.extract_old_branches.outputs.old_branches).length > 0
       }}
     outputs:
-      failed_base_names: ${{ steps.merge_branches.outputs }}
+      failed_base_names: ${{ steps.merge_branches.outputs.failed_base_names }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -176,7 +176,7 @@ jobs:
               }
             }
 
-            return failedBaseNames;
+            core.setOutput('failed_base_names', JSON.stringify(failedBaseNames));
 
   extract_new_branches:
     needs: [ merge_old_branches ]
