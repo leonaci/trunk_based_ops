@@ -114,7 +114,7 @@ jobs:
           git config user.email "actions@github.com"
 
           git add .lock
-          git commit -m "Create .lock file" || echo "No changes to commit"
+          git commit -m "Lock the repository for automatic branch management" || echo "No changes to commit"
           git push origin main
 
   merge_old_branches:
@@ -122,10 +122,10 @@ jobs:
     runs-on: [ self-hosted, Linux ]
     if: |
       ${{
-        always() &&
+        ! failure() &&
         needs.create_lock.result == 'success' &&
         needs.extract_branches.result == 'success' &&
-        needs.extract_branches.outputs.old_branches && needs.extract_branches.outputs.old_branches != '[]'
+        needs.extract_branches.outputs.old_branches && fromJson(needs.extract_branches.outputs.old_branches).length > 0
       }}
     strategy:
       fail-fast: false
@@ -266,7 +266,7 @@ jobs:
       ${{
         ! failure() &&
         needs.extract_branches.result == 'success' &&
-        needs.extract_branches.outputs.new_branches && needs.extract_branches.outputs.new_branches != '[]'
+        needs.extract_branches.outputs.new_branches && fromJson(needs.extract_branches.outputs.new_branches).length > 0
       }}
     strategy:
       fail-fast: false
@@ -369,5 +369,5 @@ jobs:
           git config user.email "actions@github.com"
 
           git add .lock
-          git commit -m "Delete .lock file" || echo "No changes to commit"
+          git commit -m "Unlock the repository after automatic branch management" || echo "No changes to commit"
           git push origin main
