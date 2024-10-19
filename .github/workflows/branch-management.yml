@@ -139,22 +139,28 @@ jobs:
 
           OLD_BRANCHES='${{ needs.extract_old_branches.outputs.old_branches }}'
           BRANCHES=$(echo "$OLD_BRANCHES" | jq -r '.[]')
+
           FAILED_BASE_NAMES=()
 
-          git checkout main
-          git pull origin main
-
           for BRANCH in $BRANCHES; do
+            echo ""
+            echo ""
             echo "Processing branch: $BRANCH"
-            BASE_NAME="${BRANCH%%/*}"
 
-            git fetch origin "$BRANCH"
+            BASE_NAME=$(echo "$BRANCH" | sed -E 's|/[^/]+$||')
 
+            echo "Base name: $BASE_NAME"
+
+            # 最新のmainを取得
+            git checkout main
+            git pull origin main
+
+            # 対象のブランチをフェッチ
+            git fetch origin "$BRANCH":"$BRANCH"
+
+            # ブランチをマージ
             if git merge --no-ff --no-edit "$BRANCH"; then
               echo "Successfully merged $BRANCH into main."
-              git push origin main
-              git branch -d "$BRANCH"
-              git push origin --delete "$BRANCH"
             else
               echo "Merge conflict when merging $BRANCH into main. Aborting merge."
               git merge --abort
@@ -162,7 +168,10 @@ jobs:
             fi
           done
 
-          echo "::set-output name=failed_base_names::$(printf '%s\n' "${FAILED_BASE_NAMES[@]}" | jq -R . | jq -s .)"
+          echo "Failed base names: ${FAILED_BASE_NAMES[@]}"
+
+          # 出力用にJSON配列に変換
+          echo "::set-output name=failed_base_names::$(echo "${FAILED_BASE_NAMES[@]}" | jq -R . | jq -s .)"
 
       - name: Set Failed Base Names Output
         if: |
