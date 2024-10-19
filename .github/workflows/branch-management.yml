@@ -122,7 +122,7 @@ jobs:
         needs.extract_old_branches.outputs.old_branches && fromJson(needs.extract_old_branches.outputs.old_branches).length > 0
       }}
     outputs:
-      failed_base_names: ${{ steps.merge_branches.outputs.failed_base_names }}
+      merged_base_names: ${{ steps.merge_branches.outputs.merged_base_names }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -144,7 +144,7 @@ jobs:
           git checkout main
           git pull origin main
 
-          FAILED_BASE_NAMES=()
+          MERGED_BASE_NAMES=()
 
           for BRANCH in $BRANCHES; do
             echo ""
@@ -154,33 +154,33 @@ jobs:
 
             BASE_NAME=$(echo "$BRANCH" | sed -E 's|/[^/]+$||')
 
-            echo "Base name: $BASE_NAME"
-
             # 対象のブランチをフェッチ
             git fetch origin "$BRANCH":"$BRANCH"
 
             # ブランチをマージ
             if git merge --no-ff --no-edit "$BRANCH"; then
               echo "Successfully merged $BRANCH into main."
+
               git push origin main
               git branch -d "$BRANCH"
               git push origin --delete "$BRANCH"
+
+              MERGED_BASE_NAMES+=("$BASE_NAME")
             else
               echo "Merge conflict when merging $BRANCH into main. Aborting merge."
+
               git merge --abort
-              FAILED_BASE_NAMES+=("$BASE_NAME")
             fi
           done
 
-          # 出力用にJSON配列に変換
-          if [ ${#FAILED_BASE_NAMES[@]} -eq 0 ]; then
-            echo "failed_base_names=[]" >> $GITHUB_OUTPUT
+          if [ ${#MERGED_BASE_NAMES[@]} -eq 0 ]; then
+            echo "merged_base_names=[]" >> $GITHUB_OUTPUT
           else
-            echo "failed_base_names=$(printf '%s\n' "${FAILED_BASE_NAMES[@]}" | jq -R . | jq -s -c .)" >> $GITHUB_OUTPUT
+            echo "merged_base_names=$(printf '%s\n' "${MERGED_BASE_NAMES[@]}" | jq -R | jq -s | jq -c 'unique')" >> $GITHUB_OUTPUT
           fi
 
       - run: |
-          echo "Failed base names: ${{ steps.merge_branches.outputs.failed_base_names }}"
+          echo "Merged base names: ${{ steps.merge_branches.outputs.merged_base_names }}"
 
   extract_new_branches:
     needs: [ merge_old_branches ]
@@ -223,22 +223,19 @@ jobs:
 
             const newBranches = [];
 
-            // Get failed_base_names from job outputs
-            const failedBaseNames = JSON.parse('${{ needs.merge_old_branches.outputs.failed_base_names }}');
+            // Get merged_base_names from job outputs
+            const mergedBaseNames = JSON.parse('${{ needs.merge_old_branches.outputs.merged_base_names }}');
 
             for (const branchConfig of config.branches)
             {
               const baseName = branchConfig.name;
 
-              // Skip creating new branch if baseName is in failedBaseNames
-              if (failedBaseNames.includes(baseName))
+              // マージが成功したブランチに対してのみ新しいブランチを作成
+              if (mergedBaseNames.includes(baseName))
               {
-                continue;
+                const mmdd = ("0" + (currentTime.getMonth() + 1)).slice(-2) + ("0" + currentTime.getDate()).slice(-2);
+                newBranches.push(`${baseName}/feature-${mmdd}`);
               }
-
-              // 新しいブランチ名を生成
-              const mmdd = ("0" + (currentTime.getMonth() + 1)).slice(-2) + ("0" + currentTime.getDate()).slice(-2);
-              newBranches.push(`${baseName}/feature-${mmdd}`);
             }
 
             core.setOutput('new_branches', JSON.stringify(newBranches));
