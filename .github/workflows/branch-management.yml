@@ -7,8 +7,11 @@ on:
   workflow_dispatch:
 
 jobs:
-  branch_management:
+  extract_branches:
     runs-on: [ self-hosted, Linux ]
+    outputs:
+      old_branches: ${{ steps.extract_branches.outputs.old_branches }}
+      new_branches: ${{ steps.extract_branches.outputs.new_branches }}
     steps:
       - uses: actions/checkout@v4
 
@@ -18,205 +21,194 @@ jobs:
 
       - run: npm install js-yaml
 
-      - name: Manage Branch Lifetime
+      - name: Extract Branches
+        id: extract_branches
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          result-encoding: json
           script: |
             const fs = require('fs');
             const yaml = require('js-yaml');
+            const core = require('@actions/core');
 
-            const branchStatusJsonPath = 'branch-status.yaml';
             const config = yaml.load(fs.readFileSync('config.yaml', 'utf8'));
-
             const currentTime = new Date();
-            console.log(`Current time: ${currentTime.toISOString()}`);
 
-            for (const branchConfig of config.branches)
-            {
+            const { data: branches } = await github.rest.repos.listBranches({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100
+            });
+
+            const oldBranches = [];
+            const newBranches = [];
+
+            for (const branchConfig of config.branches) {
               const baseName = branchConfig.name;
               const schedule = branchConfig.schedule;
 
               let shouldMerge = false;
-              // 現在の日時がマージスケジュールと一致するか確認
-              for (const scheduledTime of schedule)
-              {
+              for (const scheduledTime of schedule) {
                 const scheduledDate = new Date(scheduledTime);
 
-                if (isNaN(scheduledDate))
-                {
+                if (isNaN(scheduledDate)) {
                   console.log(`Invalid scheduledTime: ${scheduledTime}`);
                   continue;
                 }
 
                 const timeDiff = currentTime.getTime() - scheduledDate.getTime();
 
-                if (0 <= timeDiff && timeDiff < 60 * 60 * 1000)
-                {
-                  // 1時間以内
+                if (0 <= timeDiff && timeDiff < 60 * 60 * 1000) {
                   shouldMerge = true;
                   break;
                 }
               }
 
-              if (!shouldMerge)
-              {
+              if (!shouldMerge) {
                 continue;
               }
 
-              const { data: branches } = await github.rest.repos.listBranches({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                per_page: 100
-              });
-
               const branchPattern = new RegExp(`^${baseName}/feature-(\\d{4})$`);
 
-              // パターンに一致するブランチをすべてマージ
               for (const branch of branches) {
                 if (branch.name.match(branchPattern)) {
-                  const existingBranch = branch.name;
-
-                  // ブランチをmainにマージ
-                  try {
-                    await github.rest.repos.merge({
-                      owner: context.repo.owner,
-                      repo: context.repo.repo,
-                      base: 'main',
-                      head: existingBranch,
-                      commit_message: `Merging ${existingBranch} into main`
-                    });
-
-                    console.log(`Merged ${existingBranch} into main`);
-
-                    // 古いブランチを削除（オプション）
-                    await github.rest.git.deleteRef({
-                      owner: context.repo.owner,
-                      repo: context.repo.repo,
-                      ref: `heads/${existingBranch}`
-                    });
-
-                    console.log(`Deleted old branch ${existingBranch}`);
-                  }
-                  catch (error)
-                  {
-                    console.error(`Failed to merge or delete branch ${existingBranch}: ${error.message}`);
-
-                    throw error;
-                  }
+                  oldBranches.push(branch.name);
                 }
               }
-            }
 
-            // mainの最新のコミットを取得
-            const { data: mainRef } = await github.rest.git.getRef({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              ref: 'heads/main'
-            });
-
-            const { data: fileContent } = await github.rest.repos.getContent({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              path: branchStatusJsonPath,
-              ref: mainRef.object.sha
-            });
-
-            for (const branchConfig of config.branches)
-            {
-              const baseName = branchConfig.name;
-
-              const branchStatus = yaml.load(Buffer.from(fileContent.content, 'base64').toString('utf-8'));
-
-              // 新しい日付でブランチを作成
+              // 新しいブランチ名を生成
               const mmdd = ("0" + (currentTime.getMonth() + 1)).slice(-2) + ("0" + currentTime.getDate()).slice(-2);
               const newBranchName = `${baseName}/feature-${mmdd}`;
-
-              // mainから新しいブランチを作成
-              try
-              {
-                await github.rest.git.createRef({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  ref: `refs/heads/${newBranchName}`,
-                  sha: mainRef.object.sha
-                });
-
-                console.log(`Created new branch ${newBranchName}`);
-
-                // branchStatusにbasenameが存在しない場合は新規作成
-                if (!branchStatus[baseName])
-                {
-                  branchStatus[baseName] = {
-                    branch_name: newBranchName,
-                    created_at: currentTime.toISOString()
-                  };
-                }
-                else
-                {
-                  branchStatus[baseName].branch_name = newBranchName;
-                  branchStatus[baseName].created_at = currentTime.toISOString();
-                }
-              }
-              catch (error)
-              {
-                console.error(`Failed to create new branch ${newBranchName}: ${error.message}`);
-
-                throw error;
-              }
-
-              try
-              {
-                // branch-status.yamlを更新
-                fs.writeFileSync(branchStatusJsonPath, yaml.dump(branchStatus));
-
-                console.log(`Updated ${branchStatusJsonPath}`);
-
-                // 新しいブランチに対してbranch-status.yamlをコミット
-                const { data: latestCommit } = await github.rest.repos.getCommit({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  ref: `heads/${newBranchName}`
-                });
-
-                const treeItems = [
-                  {
-                    path: branchStatusJsonPath,
-                    mode: '100644',
-                    type: 'blob',
-                    content: fs.readFileSync(branchStatusJsonPath, 'utf8')
-                  }
-                ];
-
-                const { data: newTree } = await github.rest.git.createTree({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  tree: treeItems,
-                  base_tree: latestCommit.commit.tree.sha
-                });
-
-                const { data: newCommit } = await github.rest.git.createCommit({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  message: `Update ${branchStatusJsonPath}`,
-                  tree: newTree.sha,
-                  parents: [latestCommit.sha]
-                });
-
-                await github.rest.git.updateRef({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  ref: `heads/${newBranchName}`,
-                  sha: newCommit.sha
-                });
-
-                console.log(`Committed and pushed ${branchStatusJsonPath} to ${newBranchName}`);
-              }
-              catch (error)
-              {
-                console.error(`Failed to commit ${branchStatusJsonPath}: ${error.message}`);
-
-                throw error;
-              }
+              newBranches.push({ branch: newBranchName, baseName });
             }
 
+            console.log(`Old branches to merge: ${oldBranches.map(b => b).join(', ')}`);
+            console.log(`New branches to create: ${newBranches.map(nb => nb.branch).join(', ')}`);
+
+            core.setOutput('old_branches', JSON.stringify(oldBranches));
+            core.setOutput('new_branches', JSON.stringify(newBranches));
+
+  merge_old_branches:
+    needs: extract_branches
+    runs-on: [ self-hosted, Linux ]
+    if: ${{ needs.extract_branches.outputs.old_branches && fromJSON(needs.extract_branches.outputs.old_branches).length > 0 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        branch: ${{ fromJson(needs.extract_branches.outputs.old_branches) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Merge branch into main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          #!/bin/bash
+          set -e
+
+          BRANCH="${{ matrix.branch }}"
+          echo "Processing branch: $BRANCH"
+
+          # Gitの設定
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+          # 最新のmainを取得
+          git checkout main
+          git pull origin main
+
+          # 対象のブランチをフェッチ
+          git fetch origin "$BRANCH":"$BRANCH"
+
+          # ブランチをマージ
+          git merge --no-ff --no-edit "$BRANCH" || {
+            echo "Merge conflict when merging $BRANCH into main. Aborting merge."
+            git merge --abort
+            exit 1
+          }
+
+          # マージコミットをプッシュ
+          git push origin main
+
+          # ブランチを削除
+          git branch -d "$BRANCH"
+          git push origin --delete "$BRANCH"
+
+          echo "Successfully merged and deleted branch $BRANCH"
+
+  yield_new_branches:
+    needs: [merge_old_branches]
+    runs-on: [ self-hosted, Linux ]
+    if: ${{ needs.extract_branches.outputs.new_branches && fromJSON(needs.extract_branches.outputs.new_branches).length > 0 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.extract_branches.outputs.new_branches) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create new branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          #!/bin/bash
+          set -e
+
+          BRANCH="${{ matrix.branch }}"
+          echo "Creating new branch: $BRANCH"
+
+          # Gitの設定
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+          # 最新のmainを取得
+          git checkout main
+          git pull origin main
+
+          # 新しいブランチを作成
+          git checkout -b "$BRANCH"
+
+      - name: Update branch-status.yaml
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const yaml = require('js-yaml');
+            const path = 'branch-status.yaml';
+            const branch = '${{ matrix.branch }}';
+            const baseName = '${{ matrix.baseName }}';
+            const currentTime = new Date().toISOString();
+
+            let branchStatus = {};
+            if (fs.existsSync(path)) {
+              branchStatus = yaml.load(fs.readFileSync(path, 'utf8'));
+            }
+
+            branchStatus[baseName] = {
+              branch_name: branch,
+              created_at: currentTime
+            };
+
+            fs.writeFileSync(path, yaml.dump(branchStatus));
+
+            console.log(`Updated ${path}`);
+
+      - name: Commit and push changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          #!/bin/bash
+          set -e
+
+          BRANCH="${{ matrix.branch }}"
+          git add branch-status.yaml
+          git commit -m "Update branch-status.yaml for $BRANCH"
+
+          # ブランチと変更をプッシュ
+          git push origin "$BRANCH"
