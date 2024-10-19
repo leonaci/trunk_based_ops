@@ -147,7 +147,10 @@ jobs:
           FAILED_BASE_NAMES=()
 
           for BRANCH in $BRANCHES; do
-            echo "\n\n\nProcessing branch: $BRANCH"
+            echo ""
+            echo ""
+            echo ""
+            echo "Processing branch: $BRANCH"
 
             BASE_NAME=$(echo "$BRANCH" | sed -E 's|/[^/]+$||')
 
@@ -173,8 +176,11 @@ jobs:
           if [ ${#FAILED_BASE_NAMES[@]} -eq 0 ]; then
             echo "failed_base_names=[]" >> $GITHUB_ENV
           else
-            echo "failed_base_names=$(printf '%s\n' "${FAILED_BASE_NAMES[@]}" | jq -R . | jq -s .)" >> $GITHUB_ENV
+            echo "failed_base_names=$(echo "${FAILED_BASE_NAMES[@]}" | jq -R . | jq -s .)" >> $GITHUB_ENV
           fi
+
+      - run: |
+          echo "${{ steps.merge_branches.outputs.failed_base_names }}"
 
   extract_new_branches:
     needs: [ merge_old_branches ]
@@ -218,7 +224,9 @@ jobs:
             const newBranches = [];
 
             // Get failed_base_names from job outputs
-            const failedBaseNames = JSON.parse('${{ needs.merge_old_branches.outputs.failed_base_names }}');
+            const content = '${{ needs.merge_old_branches.outputs.failed_base_names }}';
+            console.log(content);
+            const failedBaseNames = JSON.parse(content);
 
             for (const branchConfig of config.branches)
             {
