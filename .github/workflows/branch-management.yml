@@ -93,7 +93,12 @@ jobs:
   merge_old_branches:
     needs: extract_branches
     runs-on: [ self-hosted, Linux ]
-    if: ${{ needs.extract_branches.outputs.old_branches && needs.extract_branches.outputs.old_branches != '[]' }}
+    if: |
+      ${{
+        always() &&
+        needs.extract_branches.result == 'success' &&
+        needs.extract_branches.outputs.old_branches && needs.extract_branches.outputs.old_branches != '[]'
+      }}
     strategy:
       fail-fast: false
       matrix:
@@ -143,13 +148,13 @@ jobs:
   yield_new_branches:
     needs: [ extract_branches, merge_old_branches ]
     runs-on: [ self-hosted, Linux ]
-    # merge_old_branchesがスキップされた場合も実行
     if: |
-      (
-        needs.merge_old_branches.result == 'success' ||
-        needs.merge_old_branches.result == 'skipped'
-      ) &&
-      needs.extract_branches.outputs.new_branches && needs.extract_branches.outputs.new_branches != '[]'
+      ${{
+        always() &&
+        needs.extract_branches.result == 'success' &&
+        needs.merge_old_branches.result != 'failure' &&
+        needs.extract_branches.outputs.new_branches && needs.extract_branches.outputs.new_branches != '[]'
+      }}
     strategy:
       fail-fast: false
       matrix:
