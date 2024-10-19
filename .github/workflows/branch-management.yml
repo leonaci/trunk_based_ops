@@ -163,6 +163,13 @@ jobs:
 
           echo "::set-output name=failed_base_names::$(printf '%s\n' "${FAILED_BASE_NAMES[@]}" | jq -R . | jq -s .)"
 
+      - name: Set Failed Base Names Output
+        if: |
+          ${{
+            always()
+          }}
+        run: echo "failed_base_names=${{ steps.merge_branches.outputs.failed_base_names }}" >> $GITHUB_OUTPUT
+
   extract_new_branches:
     needs: [ merge_old_branches ]
     runs-on: [ self-hosted, Linux ]
