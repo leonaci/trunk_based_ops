@@ -70,7 +70,7 @@ jobs:
                 continue;
               }
 
-              const branchPattern = new RegExp(`^${baseName}/feature-(\\d{4})$`);
+              const branchPattern = new RegExp(`^${baseName}/\\w+-\\d+$`);
 
               for (const branch of branches) {
                 if (branch.name.match(branchPattern)) {
@@ -336,8 +336,19 @@ jobs:
               // マージが成功したブランチに対してのみ新しいブランチを作成
               if (mergedBaseNames.includes(baseName))
               {
-                const mmdd = ("0" + (currentTime.getMonth() + 1)).slice(-2) + ("0" + currentTime.getDate()).slice(-2);
-                newBranches.push(`${baseName}/feature-${mmdd}`);
+                // 既存のブランチから最大番号を取得
+                const existingNumbers = branches
+                  .filter(b => b.name.startsWith(`${baseName}/${branchConfig.status}-`))
+                  .map(b => parseInt(b.name.split(`${baseName}/${branchConfig.status}-`)[1], 10))
+                  .filter(n => !isNaN(n));
+
+                // 最終番号を取得またはリセット
+                let nextNumber = 1;
+                if (existingNumbers.length > 0) {
+                  nextNumber = Math.max(...existingNumbers) + 1;
+                }
+
+                newBranches.push(`${baseName}/${branchConfig.status}-${nextNumber}`);
               }
             }
 
