@@ -94,7 +94,7 @@ jobs:
   merge_old_branches:
     needs: extract_branches
     runs-on: [ self-hosted, Linux ]
-    if: ${{ needs.extract_branches.outputs.old_branches && fromJSON(needs.extract_branches.outputs.old_branches).length > 0 }}
+    if: ${{ needs.extract_branches.outputs.old_branches }}
     strategy:
       fail-fast: false
       matrix:
@@ -144,7 +144,7 @@ jobs:
   yield_new_branches:
     needs: [merge_old_branches]
     runs-on: [ self-hosted, Linux ]
-    if: ${{ needs.extract_branches.outputs.new_branches && fromJSON(needs.extract_branches.outputs.new_branches).length > 0 }}
+    if: ${{ needs.extract_branches.outputs.new_branches }}
     strategy:
       fail-fast: false
       matrix:
