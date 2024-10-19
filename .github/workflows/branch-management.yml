@@ -364,7 +364,7 @@ jobs:
       ${{
         ! failure() &&
         needs.extract_new_branches.result == 'success' &&
-        needs.extract_new_branches.outputs.new_branches && needs.extract_new_branches.outputs.new_branches != '[]'
+        needs.extract_new_branches.outputs.new_branches && fromJson(needs.extract_new_branches.outputs.new_branches)[0] != null
       }}
     steps:
       - uses: actions/checkout@v4
