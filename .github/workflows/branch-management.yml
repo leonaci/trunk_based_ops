@@ -7,11 +7,14 @@ on:
   workflow_dispatch:
 
 jobs:
-  extract_branches:
+  extract_old_branches:
     runs-on: [ self-hosted, Linux ]
+    if: |
+      ${{
+        always()
+      }}
     outputs:
-      old_branches: ${{ steps.extract_branches.outputs.old_branches }}
-      new_branches: ${{ steps.extract_branches.outputs.new_branches }}
+      old_branches: ${{ steps.extract_old_branches.outputs.old_branches }}
     steps:
       - uses: actions/checkout@v4
 
@@ -22,7 +25,7 @@ jobs:
       - run: npm install js-yaml
 
       - name: Extract Branches
-        id: extract_branches
+        id: extract_old_branches
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -41,7 +44,6 @@ jobs:
             });
 
             const oldBranches = [];
-            const newBranches = [];
 
             for (const branchConfig of config.branches) {
               const baseName = branchConfig.name;
@@ -75,20 +77,12 @@ jobs:
                   oldBranches.push(branch.name);
                 }
               }
-
-              // 新しいブランチ名を生成
-              const mmdd = ("0" + (currentTime.getMonth() + 1)).slice(-2) + ("0" + currentTime.getDate()).slice(-2);
-              newBranches.push(`${baseName}/feature-${mmdd}`);
             }
 
             core.setOutput('old_branches', JSON.stringify(oldBranches));
-            core.setOutput('new_branches', JSON.stringify(newBranches));
 
       - run: |
-          echo "Old branches: ${{ steps.extract_branches.outputs.old_branches }}"
-
-      - run: |
-          echo "New branches: ${{ steps.extract_branches.outputs.new_branches }}"
+          echo "Old branches: ${{ steps.extract_old_branches.outputs.old_branches }}"
 
   create_lock:
     runs-on: [ self-hosted, Linux ]
@@ -118,69 +112,149 @@ jobs:
           git push origin main
 
   merge_old_branches:
-    needs: [ extract_branches, create_lock ]
+    needs: [ extract_old_branches, create_lock ]
     runs-on: [ self-hosted, Linux ]
     if: |
       ${{
         ! failure() &&
         needs.create_lock.result == 'success' &&
-        needs.extract_branches.result == 'success' &&
-        needs.extract_branches.outputs.old_branches && fromJson(needs.extract_branches.outputs.old_branches).length > 0
+        needs.extract_old_branches.result == 'success' &&
+        needs.extract_old_branches.outputs.old_branches && fromJson(needs.extract_old_branches.outputs.old_branches).length > 0
       }}
-    strategy:
-      fail-fast: false
-      matrix:
-        branch: ${{ fromJson(needs.extract_branches.outputs.old_branches) }}
+    outputs:
+      failed_base_names: ${{ steps.merge_branches.outputs.failed_base_names }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Merge branch into main
+      - name: Merge Branches Sequentially
+        id: merge_branches
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           #!/bin/bash
           set -e
 
-          BRANCH="${{ matrix.branch }}"
-          echo "Processing branch: $BRANCH"
-
-          # Gitの設定
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
 
-          # 最新のmainを取得
-          git checkout main
-          git pull origin main
+          OLD_BRANCHES='${{ needs.extract_old_branches.outputs.old_branches }}'
+          BRANCHES=$(echo $OLD_BRANCHES | jq -r '.[]')
 
-          # 対象のブランチをフェッチ
-          git fetch origin "$BRANCH":"$BRANCH"
+          FAILED_BASE_NAMES=()
 
-          # ブランチをマージ
-          git merge --no-ff --no-edit "$BRANCH" || {
-            echo "Merge conflict when merging $BRANCH into main. Aborting merge."
-            git merge --abort
-            exit 1
-          }
+          for BRANCH in $BRANCHES; do
+            echo "Processing branch: $BRANCH"
 
-          # マージコミットをプッシュ
-          git push origin main
+            BASE_NAME=$(echo "$BRANCH" | cut -d'/' -f1)
 
-          # ブランチを削除
-          git branch -d "$BRANCH"
-          git push origin --delete "$BRANCH"
+            # 最新のmainを取得
+            git checkout main
+            git pull origin main
 
-          echo "Successfully merged and deleted branch $BRANCH"
+            # 対象のブランチをフェッチ
+            git fetch origin "$BRANCH":"$BRANCH"
+
+            # ブランチをマージ
+            if git merge --no-ff --no-edit "$BRANCH"; then
+              echo "Successfully merged $BRANCH into main."
+
+              # マージコミットをプッシュ
+              git push origin main
+
+              # ブランチを削除
+              git branch -d "$BRANCH"
+              git push origin --delete "$BRANCH"
+            else
+              echo "Merge conflict when merging $BRANCH into main. Aborting merge."
+              git merge --abort
+              FAILED_BASE_NAMES+=("$BASE_NAME")
+            fi
+          done
+
+          # 出力用にJSON配列に変換
+          echo "::set-output name=failed_base_names::$(echo "${FAILED_BASE_NAMES[@]}" | jq -R . | jq -s .)"
+
+      - name: Set Failed Base Names Output
+        if: |
+          ${{
+            always()
+          }}
+        run: echo "failed_base_names=${{ steps.merge_branches.outputs.failed_base_names }}" >> $GITHUB_OUTPUT
+
+  extract_new_branches:
+    needs: [ merge_old_branches ]
+    runs-on: [ self-hosted, Linux ]
+    if: |
+      ${{ 
+        ! failure()
+      }}
+    outputs:
+      new_branches: ${{ steps.extract_new_branches.outputs.new_branches }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm install js-yaml
+
+      - name: Extract New Branches
+        id: extract_new_branches
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          result-encoding: json
+          script: |
+            const fs = require('fs');
+            const yaml = require('js-yaml');
+
+            const config = yaml.load(fs.readFileSync('config.yaml', 'utf8'));
+            const currentTime = new Date();
+
+            const { data: branches } = await github.rest.repos.listBranches({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100
+            });
+
+            const newBranches = [];
+
+            // Get failed_base_names from job outputs
+            const failedBaseNames = JSON.parse('${{ needs.merge_old_branches.outputs.failed_base_names }}');
+
+            for (const branchConfig of config.branches)
+            {
+              const baseName = branchConfig.name;
+
+              // Skip creating new branch if baseName is in failedBaseNames
+              if (failedBaseNames.includes(baseName))
+              {
+                continue;
+              }
+
+              // 新しいブランチ名を生成
+              const mmdd = ("0" + (currentTime.getMonth() + 1)).slice(-2) + ("0" + currentTime.getDate()).slice(-2);
+              newBranches.push(`${baseName}/feature-${mmdd}`);
+            }
+
+            core.setOutput('new_branches', JSON.stringify(newBranches));
+
+      - run: |
+          echo "New branches after filtering: ${{ steps.extract_new_branches.outputs.new_branches }}"
 
   update_branch_status:
-    needs: [ extract_branches, merge_old_branches ]
+    needs: [ extract_new_branches ]
     runs-on: [ self-hosted, Linux ]
     if: |
       ${{
         ! failure() &&
-        needs.extract_branches.result == 'success' &&
-        needs.extract_branches.outputs.new_branches && needs.extract_branches.outputs.new_branches != '[]'
+        needs.extract_new_branches.result == 'success' &&
+        needs.extract_new_branches.outputs.new_branches && fromJson(needs.extract_new_branches.outputs.new_branches).length > 0 
       }}
     steps:
       - uses: actions/checkout@v4
@@ -213,7 +287,7 @@ jobs:
             }
 
             // Get new branches from job outputs
-            const newBranches = JSON.parse('${{ needs.extract_branches.outputs.new_branches }}');
+            const newBranches = JSON.parse('${{ needs.extract_new_branches.outputs.new_branches }}');
 
             let updated = false;
             const currentTime = new Date().toISOString();
@@ -260,18 +334,18 @@ jobs:
           git push origin main
 
   yield_new_branches:
-    needs: [ extract_branches, merge_old_branches, update_branch_status ]
+    needs: [ extract_new_branches, update_branch_status ]
     runs-on: [ self-hosted, Linux ]
     if: |
       ${{
         ! failure() &&
-        needs.extract_branches.result == 'success' &&
-        needs.extract_branches.outputs.new_branches && fromJson(needs.extract_branches.outputs.new_branches).length > 0
+        needs.extract_new_branches.result == 'success' &&
+        needs.extract_new_branches.outputs.new_branches && fromJson(needs.extract_new_branches.outputs.new_branches).length > 0 
       }}
     strategy:
       fail-fast: false
       matrix:
-        branch: ${{ fromJson(needs.extract_branches.outputs.new_branches) }}
+        branch: ${{ fromJson(needs.extract_new_branches.outputs.new_branches) }}
     steps:
       - uses: actions/checkout@v4
         with:
