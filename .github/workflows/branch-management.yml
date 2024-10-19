@@ -90,12 +90,39 @@ jobs:
       - run: |
           echo "New branches: ${{ steps.extract_branches.outputs.new_branches }}"
 
+  create_lock:
+    runs-on: [ self-hosted, Linux ]
+    if: |
+      ${{
+        always()
+      }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create .lock file
+        run: |
+          touch .lock
+
+      - name: Commit and push .lock file
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+          git add .lock
+          git commit -m "Create .lock file" || echo "No changes to commit"
+          git push origin main
+
   merge_old_branches:
-    needs: extract_branches
+    needs: [ extract_branches, create_lock ]
     runs-on: [ self-hosted, Linux ]
     if: |
       ${{
         always() &&
+        needs.create_lock.result == 'success' &&
         needs.extract_branches.result == 'success' &&
         needs.extract_branches.outputs.old_branches && needs.extract_branches.outputs.old_branches != '[]'
       }}
@@ -315,3 +342,30 @@ jobs:
 
           # ブランチと変更をプッシュ
           git push origin "$BRANCH"
+
+  delete_lock:
+    runs-on: [ self-hosted, Linux ]
+    needs: yield_new_branches
+    if: |
+      ${{
+        always()
+      }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Delete .lock file
+        run: |
+          rm -f .lock
+
+      - name: Commit and push .lock file deletion
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+          git add .lock
+          git commit -m "Delete .lock file" || echo "No changes to commit"
+          git push origin main
