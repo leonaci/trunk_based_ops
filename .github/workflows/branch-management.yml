@@ -143,7 +143,7 @@ jobs:
   yield_new_branches:
     needs: [merge_old_branches]
     runs-on: [ self-hosted, Linux ]
-    if: ${{ needs.extract_branches.outputs.new_branches && needs.extract_branches.outputs.new_branches != '[]' }}
+    if: ${{ needs.extract_branches.outputs.new_branches }}
     strategy:
       fail-fast: false
       matrix:
