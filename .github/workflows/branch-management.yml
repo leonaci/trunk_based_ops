@@ -129,12 +129,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - run: npm install js-yaml
-
       - name: Merge Branches Sequentially
         id: merge_branches
         env:
@@ -202,6 +196,12 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm install js-yaml
 
       - name: Schedule Retry for Failed Branches
         if: |
