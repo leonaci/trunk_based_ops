@@ -141,9 +141,9 @@ jobs:
           echo "Successfully merged and deleted branch $BRANCH"
 
   yield_new_branches:
-    needs: [merge_old_branches]
+    needs: [extract_branches, merge_old_branches]
     runs-on: [ self-hosted, Linux ]
-    if: ${{ needs.extract_branches.outputs.new_branches }}
+    if: ${{ needs.extract_branches.outputs.new_branches && needs.extract_branches.outputs.new_branches != '[]' }}
     strategy:
       fail-fast: false
       matrix:
