@@ -78,8 +78,7 @@ jobs:
 
               // 新しいブランチ名を生成
               const mmdd = ("0" + (currentTime.getMonth() + 1)).slice(-2) + ("0" + currentTime.getDate()).slice(-2);
-              const newBranchName = `${baseName}/feature-${mmdd}`;
-              newBranches.push({ branch: newBranchName, baseName });
+              newBranches.push(`${baseName}/feature-${mmdd}`);
             }
 
             core.setOutput('old_branches', JSON.stringify(oldBranches));
@@ -94,7 +93,7 @@ jobs:
   merge_old_branches:
     needs: extract_branches
     runs-on: [ self-hosted, Linux ]
-    if: ${{ needs.extract_branches.outputs.old_branches }}
+    if: ${{ needs.extract_branches.outputs.old_branches && needs.extract_branches.outputs.old_branches != '[]' }}
     strategy:
       fail-fast: false
       matrix:
@@ -144,11 +143,11 @@ jobs:
   yield_new_branches:
     needs: [merge_old_branches]
     runs-on: [ self-hosted, Linux ]
-    if: ${{ needs.extract_branches.outputs.new_branches }}
+    if: ${{ needs.extract_branches.outputs.new_branches && needs.extract_branches.outputs.new_branches != '[]' }}
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJson(needs.extract_branches.outputs.new_branches) }}
+        branch: ${{ fromJson(needs.extract_branches.outputs.new_branches) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -184,7 +183,7 @@ jobs:
             const yaml = require('js-yaml');
             const path = 'branch-status.yaml';
             const branch = '${{ matrix.branch }}';
-            const baseName = '${{ matrix.baseName }}';
+            const baseName = branch.replace(/\/[^/]+$/, '');
             const currentTime = new Date().toISOString();
 
             let branchStatus = {};
