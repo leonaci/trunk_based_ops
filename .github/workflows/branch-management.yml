@@ -20,6 +20,7 @@ jobs:
           node-version: 20
 
       - run: npm install js-yaml
+      - run: npm install @actions/core
 
       - name: Extract Branches
         id: extract_branches
