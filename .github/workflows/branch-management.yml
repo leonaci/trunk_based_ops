@@ -141,9 +141,15 @@ jobs:
           echo "Successfully merged and deleted branch $BRANCH"
 
   yield_new_branches:
-    needs: [extract_branches, merge_old_branches]
+    needs: [ extract_branches, merge_old_branches ]
     runs-on: [ self-hosted, Linux ]
-    if: ${{ needs.extract_branches.outputs.new_branches && needs.extract_branches.outputs.new_branches != '[]' }}
+    # merge_old_branchesがスキップされた場合も実行
+    if: |
+      (
+        needs.merge_old_branches.result == 'success' ||
+        needs.merge_old_branches.result == 'skipped'
+      ) &&
+      needs.extract_branches.outputs.new_branches && needs.extract_branches.outputs.new_branches != '[]'
     strategy:
       fail-fast: false
       matrix:
