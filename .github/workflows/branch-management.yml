@@ -82,11 +82,12 @@ jobs:
               newBranches.push({ branch: newBranchName, baseName });
             }
 
-            console.log(`Old branches to merge: ${oldBranches.map(b => b).join(', ')}`);
-            console.log(`New branches to create: ${newBranches.map(nb => nb.branch).join(', ')}`);
-
             core.setOutput('old_branches', JSON.stringify(oldBranches));
             core.setOutput('new_branches', JSON.stringify(newBranches));
+
+      - run: echo "Old branches: ${{ steps.extract_branches.outputs.old_branches }}"
+
+      - run: echo "New branches: ${{ steps.extract_branches.outputs.new_branches }}"
 
   merge_old_branches:
     needs: extract_branches
