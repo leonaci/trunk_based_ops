@@ -204,6 +204,7 @@ jobs:
       - run: npm install js-yaml
 
       - name: Schedule Retry for Failed Branches
+        id: schedule_retry
         if: |
           ${{
             steps.merge_branches.outputs.failed_base_names && fromJson(steps.merge_branches.outputs.failed_base_names).length > 0
@@ -232,19 +233,37 @@ jobs:
             const currentTime = new Date();
             const oneHourLater = new Date(currentTime.getTime() - (currentTime.getTime() % (60 * 60 * 1000)) + 60 * 60 * 1000).toISOString();
 
+            let modified = false;
+
             for (const baseName of failedBaseNames)
             {
               for (const branchConfig of config.branches)
               {
                 if (branchConfig.name === baseName)
                 {
-                  branchConfig.schedule.push(oneHourLater);
-                  console.log(`Scheduled retry for ${baseName} at ${oneHourLater}`);
+                  if (!branchConfig.schedule.includes(oneHourLater))
+                  {
+                    branchConfig.schedule.push(oneHourLater);
+                    console.log(`Scheduled retry for ${baseName} at ${oneHourLater}`);
+                    modified = true;
+                  }
+                  else
+                  {
+                    console.log(`Retry already scheduled for ${baseName} at ${oneHourLater}`);
+                  }
                 }
               }
             }
 
+            if (modified)
+            {
+              fs.writeFileSync(path, yaml.dump(config));
+            }
+
+            core.setOutput('config_modified', modified ? 'true' : 'false');  // 変更があったかを出力
+
       - name: Commit and push config.yaml
+        if: ${{ steps.schedule_retry.outputs.config_modified == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -252,7 +271,7 @@ jobs:
           git config user.email "actions@github.com"
 
           git add config.yaml
-          git commit -m "Schedule retry for failed branches"
+          git commit -m "Schedule retry for failed branches" || echo "No changes to commit"
           git push origin main
 
   extract_new_branches:
