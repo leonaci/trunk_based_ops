@@ -398,7 +398,7 @@ jobs:
               {
                 branchStatus[baseName] = {
                   branch_name: branch,
-                  created_at: currentTime
+                  timestamp: currentTime
                 };
                 updated = true;
                 console.log(`Added entry for branch: ${branch}`);
@@ -496,7 +496,7 @@ jobs:
 
             branchStatus[baseName] = {
               branch_name: branch,
-              created_at: currentTime
+              timestamp: currentTime
             };
 
             fs.writeFileSync(path, yaml.dump(branchStatus));
