@@ -176,7 +176,7 @@ jobs:
           if [ ${#FAILED_BASE_NAMES[@]} -eq 0 ]; then
             echo "failed_base_names=[]" >> $GITHUB_OUTPUT
           else
-            echo "failed_base_names=$(printf '%s\n' "${FAILED_BASE_NAMES[@]}" | jq -R . | jq -s .)" >> $GITHUB_OUTPUT
+            echo "failed_base_names=$(printf '%s\n' "${FAILED_BASE_NAMES[@]}" | jq -R . | jq -s -c .)" >> $GITHUB_OUTPUT
           fi
 
       - run: |
