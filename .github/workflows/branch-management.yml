@@ -85,9 +85,11 @@ jobs:
             core.setOutput('old_branches', JSON.stringify(oldBranches));
             core.setOutput('new_branches', JSON.stringify(newBranches));
 
-      - run: echo "Old branches: ${{ steps.extract_branches.outputs.old_branches }}"
+      - run: |
+          echo "Old branches: ${{ steps.extract_branches.outputs.old_branches }}"
 
-      - run: echo "New branches: ${{ steps.extract_branches.outputs.new_branches }}"
+      - run: |
+          echo "New branches: ${{ steps.extract_branches.outputs.new_branches }}"
 
   merge_old_branches:
     needs: extract_branches
