@@ -122,69 +122,61 @@ jobs:
         needs.extract_old_branches.outputs.old_branches && fromJson(needs.extract_old_branches.outputs.old_branches).length > 0
       }}
     outputs:
-      failed_base_names: ${{ steps.merge_branches.outputs.failed_base_names }}
+      failed_base_names: ${{ steps.merge_branches.outputs }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Install jq
-        run: sudo apt-get install jq
-
       - name: Merge Branches Sequentially
         id: merge_branches
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          #!/bin/bash
-          set -e
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          result-encoding: string
+          script: |
+            const oldBranches = JSON.parse('${{ needs.extract_old_branches.outputs.old_branches }}');
+            const failedBaseNames = [];
 
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
+            for (const branch of oldBranches)
+            {
+              console.log(`Processing branch: ${branch}`);
+              const baseName = branch.split('/')[0];
 
-          OLD_BRANCHES='${{ needs.extract_old_branches.outputs.old_branches }}'
-          BRANCHES=$(echo $OLD_BRANCHES | jq -r '.[]')
+              try {
+                // Attempt to merge the branch into main
+                const mergeResponse = await github.rest.repos.merge({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  base: 'main',
+                  head: branch,
+                  commit_message: `Merging ${branch} into main`
+                });
+                console.log(`Successfully merged ${branch} into main.`);
 
-          FAILED_BASE_NAMES=()
+                // Delete the branch remotely
+                await github.rest.git.deleteRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: `heads/${branch}`
+                });
+                console.log(`Deleted branch ${branch}.`);
+              }
+              catch (error)
+              {
+                if (error.status === 409)
+                {
+                  console.log(`Merge conflict when merging ${branch} into main. Aborting merge.`);
+                }
+                else
+                {
+                  console.error(`Error merging branch ${branch}: ${error.message}`);
+                }
+                failedBaseNames.push(baseName);
+              }
+            }
 
-          for BRANCH in $BRANCHES; do
-            echo "Processing branch: $BRANCH"
-
-            BASE_NAME=$(echo "$BRANCH" | cut -d'/' -f1)
-
-            # 最新のmainを取得
-            git checkout main
-            git pull origin main
-
-            # 対象のブランチをフェッチ
-            git fetch origin "$BRANCH":"$BRANCH"
-
-            # ブランチをマージ
-            if git merge --no-ff --no-edit "$BRANCH"; then
-              echo "Successfully merged $BRANCH into main."
-
-              # マージコミットをプッシュ
-              git push origin main
-
-              # ブランチを削除
-              git branch -d "$BRANCH"
-              git push origin --delete "$BRANCH"
-            else
-              echo "Merge conflict when merging $BRANCH into main. Aborting merge."
-              git merge --abort
-              FAILED_BASE_NAMES+=("$BASE_NAME")
-            fi
-          done
-
-          # 出力用にJSON配列に変換
-          echo "::set-output name=failed_base_names::$(echo "${FAILED_BASE_NAMES[@]}" | jq -R . | jq -s .)"
-
-      - name: Set Failed Base Names Output
-        if: |
-          ${{
-            always()
-          }}
-        run: echo "failed_base_names=${{ steps.merge_branches.outputs.failed_base_names }}" >> $GITHUB_OUTPUT
+            return failedBaseNames;
 
   extract_new_branches:
     needs: [ merge_old_branches ]
