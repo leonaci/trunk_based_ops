@@ -17,7 +17,7 @@ jobs:
       - name: Protect main branch
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.BRANCH_MANAGE_TOKEN }}
           script: |
             await github.rest.repos.updateBranchProtection({
               owner: context.repo.owner,
@@ -55,7 +55,7 @@ jobs:
         id: extract_old_branches
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.BRANCH_MANAGE_TOKEN }}
           result-encoding: json
           script: |
             const fs = require('fs');
@@ -131,7 +131,7 @@ jobs:
       - name: Merge Branches Sequentially
         id: merge_branches
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.BRANCH_MANAGE_TOKEN }}
         continue-on-error: true
         run: |
           git config user.name "GitHub Actions"
@@ -207,7 +207,7 @@ jobs:
         if: ${{ always() }}
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.BRANCH_MANAGE_TOKEN }}
           script: |
             const fs = require('fs');
             const yaml = require('js-yaml');
@@ -272,7 +272,7 @@ jobs:
       - name: Commit and push config.yaml
         if: ${{ steps.re_schedule.outputs.config_modified == 'true' }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.BRANCH_MANAGE_TOKEN }}
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
@@ -305,7 +305,7 @@ jobs:
         id: extract_new_branches
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.BRANCH_MANAGE_TOKEN }}
           result-encoding: json
           script: |
             const fs = require('fs');
@@ -377,7 +377,7 @@ jobs:
         id: check_update_status
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.BRANCH_MANAGE_TOKEN }}
           script: |
             const fs = require('fs');
             const yaml = require('js-yaml');
@@ -425,7 +425,7 @@ jobs:
       - name: Commit and Push branch-status.yaml
         if: ${{ steps.check_update_status.outputs.updated == 'true' }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.BRANCH_MANAGE_TOKEN }}
         run: |
           #!/bin/bash
           set -e
@@ -464,7 +464,7 @@ jobs:
 
       - name: Create new branch
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.BRANCH_MANAGE_TOKEN }}
         run: |
           #!/bin/bash
           set -e
@@ -486,7 +486,7 @@ jobs:
       - name: Update branch-status.yaml
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.BRANCH_MANAGE_TOKEN }}
           script: |
             const fs = require('fs');
             const yaml = require('js-yaml');
@@ -511,7 +511,7 @@ jobs:
 
       - name: Commit and push changes
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.BRANCH_MANAGE_TOKEN }}
         run: |
           BRANCH="${{ matrix.branch }}"
 
