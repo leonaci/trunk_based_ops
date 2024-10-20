@@ -272,10 +272,9 @@ jobs:
                 if (existed)
                 {
                   const branchName = branchStatus[baseName].branch_name;
-                  if (branchName.startsWith(`${baseName}/${status}-`))
-                  {
-                    nextNumber = parseInt(branchName.split(`${baseName}/${status}-`)[1], 10) + 1;
-                  }
+
+                  const eReg = new RegExp(`^${baseName}/\\w+-(\\d+)$`);
+                  nextNumber = parseInt(branchName.match(eReg)[1]) + 1;
                 }
 
                 newBranches.push(`${baseName}/${status}-${nextNumber}`);
