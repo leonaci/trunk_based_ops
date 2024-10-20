@@ -5,6 +5,14 @@ on:
     - cron: '0 * * * *' # 毎時0分に実行
 
   workflow_dispatch:
+    inputs:
+      base_branch:
+        description: 'Base branch to use'
+        required: false
+        default: 'main'
+
+env:
+  BASE_BRANCH: ${{ github.event.inputs.base_branch || 'main' }}
 
 jobs:
   create_lock:
@@ -13,10 +21,12 @@ jobs:
       ${{
         always()
       }}
+    env:
+      BASE_BRANCH: ${{ env.BASE_BRANCH }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ env.BASE_BRANCH }}
           fetch-depth: 0
 
       - name: Create .lock file
@@ -30,20 +40,19 @@ jobs:
       - name: Commit and push .lock file
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_BRANCH: ${{ env.BASE_BRANCH }}
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
 
           git add .lock
           git commit -m "Lock the repository for automatic branch management" || echo "No changes to commit"
-          git push origin main
+          git push origin $BASE_BRANCH
 
   extract_old_branches:
     runs-on: [ self-hosted, Linux ]
     if: >-
-      ${{
-        always()
-      }}
+      ${{ always() }}
     outputs:
       existed_branches: ${{ steps.extract_old_branches.outputs.existed_branches }}
       old_branches: ${{ steps.extract_old_branches.outputs.old_branches }}
@@ -113,11 +122,7 @@ jobs:
               }
             }
 
-            const existedBranches = [];
-            for (const branch of branches)
-            {
-              existedBranches.push(branch.name);
-            }
+            const existedBranches = branches.map(branch => branch.name);
 
             core.setOutput('existed_branches', JSON.stringify(existedBranches));
             core.setOutput('old_branches', JSON.stringify(oldBranches));
@@ -140,6 +145,8 @@ jobs:
     outputs:
       merged_base_names: ${{ steps.merge_branches.outputs.merged_base_names }}
       failed_base_names: ${{ steps.merge_branches.outputs.failed_base_names }}
+    env:
+      BASE_BRANCH: ${{ env.BASE_BRANCH }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -149,6 +156,7 @@ jobs:
         id: merge_branches
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_BRANCH: ${{ env.BASE_BRANCH }}
         continue-on-error: true
         run: |
           git config user.name "GitHub Actions"
@@ -157,9 +165,9 @@ jobs:
           OLD_BRANCHES='${{ needs.extract_old_branches.outputs.old_branches }}'
           BRANCHES=$(echo "$OLD_BRANCHES" | jq -r '.[]')
 
-          # 最新のmainを取得
-          git checkout main
-          git pull origin main
+          # 最新のBASE_BRANCHを取得
+          git checkout $BASE_BRANCH
+          git pull origin $BASE_BRANCH
 
           MERGED_BASE_NAMES=()
           FAILED_BASE_NAMES=()
@@ -175,20 +183,20 @@ jobs:
 
             BASE_NAME=$(echo "$BRANCH" | sed -E 's|/[^/]+$||')
 
-            # 対象のブランチをフェッチ
+            # ブランチをフェッチ
             git fetch origin "$BRANCH":"$BRANCH"
 
             # ブランチをマージ
             if git merge --no-ff --no-edit "$BRANCH"; then
-              echo "Successfully merged $BRANCH into main."
+              echo "Successfully merged $BRANCH into $BASE_BRANCH."
 
-              git push origin main
+              git push origin $BASE_BRANCH
               git branch -d "$BRANCH"
               git push origin --delete "$BRANCH"
 
               MERGED_BASE_NAMES+=("$BASE_NAME")
             else
-              echo "Merge conflict when merging $BRANCH into main. Aborting merge."
+              echo "Merge conflict when merging $BRANCH into $BASE_BRANCH. Aborting merge."
 
               git merge --abort
               FAILED_BASE_NAMES+=("$BASE_NAME")
@@ -209,7 +217,7 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ env.BASE_BRANCH }}
           fetch-depth: 0
 
       - uses: actions/setup-node@v4
@@ -288,13 +296,14 @@ jobs:
         if: ${{ steps.re_schedule.outputs.config_modified == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_BRANCH: ${{ env.BASE_BRANCH }}
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
 
           git add config.yaml
           git commit -m "Update config.yaml for re-scheduling" || echo "No changes to commit"
-          git push origin main
+          git push origin $BASE_BRANCH
 
   extract_new_branches:
     needs: [ extract_old_branches, merge_old_branches ]
@@ -385,10 +394,12 @@ jobs:
         needs.extract_new_branches.outputs.new_branches && 
         needs.extract_new_branches.outputs.new_branches != '[]'
       }}
+    env:
+      BASE_BRANCH: ${{ env.BASE_BRANCH }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ env.BASE_BRANCH }}
           fetch-depth: 0
 
       - uses: actions/setup-node@v4
@@ -450,17 +461,14 @@ jobs:
         if: ${{ steps.check_update_status.outputs.updated == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_BRANCH: ${{ env.BASE_BRANCH }}
         run: |
-          #!/bin/bash
-          set -e
-
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
 
           git add branch-status.yaml
-          git commit -m "Add entries to branch-status.yaml for new branches"
-
-          git push origin main
+          git commit -m "Add entries to branch-status.yaml for new branches" || echo "No changes to commit"
+          git push origin $BASE_BRANCH
 
   yield_new_branches:
     needs: [ extract_new_branches, pre_update_branch_status ]
@@ -477,6 +485,8 @@ jobs:
       fail-fast: false
       matrix:
         branch: ${{ fromJson(needs.extract_new_branches.outputs.new_branches) }}
+    env:
+      BASE_BRANCH: ${{ env.BASE_BRANCH }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -491,6 +501,7 @@ jobs:
       - name: Create new branch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_BRANCH: ${{ env.BASE_BRANCH }}
         run: |
           #!/bin/bash
           set -e
@@ -502,9 +513,9 @@ jobs:
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
 
-          # 最新のmainを取得
-          git checkout main
-          git pull origin main
+          # 最新のBASE_BRANCHを取得
+          git checkout $BASE_BRANCH
+          git pull origin $BASE_BRANCH
 
           # 新しいブランチを作成
           git checkout -b "$BRANCH"
@@ -538,11 +549,12 @@ jobs:
       - name: Commit and push changes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_BRANCH: ${{ env.BASE_BRANCH }}
         run: |
           BRANCH="${{ matrix.branch }}"
 
           git add branch-status.yaml
-          git commit -m "Update branch-status.yaml for $BRANCH"
+          git commit -m "Update branch-status.yaml for $BRANCH" || echo "No changes to commit"
           git push origin "$BRANCH"
 
   delete_lock:
@@ -552,10 +564,12 @@ jobs:
       ${{
         always()
       }}
+    env:
+      BASE_BRANCH: ${{ env.BASE_BRANCH }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ env.BASE_BRANCH }}
           fetch-depth: 0
 
       - name: Delete .lock file
@@ -565,10 +579,11 @@ jobs:
       - name: Commit and push .lock file deletion
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_BRANCH: ${{ env.BASE_BRANCH }}
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
 
           git add .lock
           git commit -m "Unlock the repository after automatic branch management" || echo "No changes to commit"
-          git push origin main
+          git push origin $BASE_BRANCH
