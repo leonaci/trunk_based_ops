@@ -207,10 +207,7 @@ jobs:
           echo "Merged base names: ${{ steps.merge_branches.outputs.merged_base_names }}"
           echo "Failed base names: ${{ steps.merge_branches.outputs.failed_base_names }}"
 
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ env.BASE_BRANCH }}
-          fetch-depth: 0
+      - run: git checkout $BASE_BRANCH
 
       - uses: actions/setup-node@v4
         with:
@@ -484,9 +481,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          #!/bin/bash
-          set -e
-
           BRANCH="${{ matrix.branch }}"
           echo "Creating new branch: $BRANCH"
 
