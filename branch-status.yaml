@@ -1,5 +1,5 @@
 scene1:
-  status: feature
+  status: mock
   schedules:
     - '2024-10-20T12:00:00.000Z'
     - '2024-10-20T13:00:00.000Z'
