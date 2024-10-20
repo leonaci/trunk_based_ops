@@ -106,7 +106,7 @@ jobs:
   merge_old_branches:
     needs: [ protect_main_branch, extract_old_branches ]
     runs-on: [ self-hosted, Linux ]
-    if: |
+    if: >-
       ${{
         always() &&
         needs.protect_main_branch.conclusion == 'success' &&
@@ -277,7 +277,7 @@ jobs:
   extract_new_branches:
     needs: [ merge_old_branches ]
     runs-on: [ self-hosted, Linux ]
-    if: |
+    if: >-
       ${{ 
         always() &&
         needs.merge_old_branches.conclusion == 'success'
@@ -350,7 +350,7 @@ jobs:
   update_branch_status:
     needs: [ extract_new_branches ]
     runs-on: [ self-hosted, Linux ]
-    if: |
+    if: >-
       ${{
         always() &&
         needs.extract_new_branches.conclusion == 'success' &&
@@ -436,7 +436,7 @@ jobs:
   yield_new_branches:
     needs: [ extract_new_branches, update_branch_status ]
     runs-on: [ self-hosted, Linux ]
-    if: |
+    if: >-
       ${{
         always() &&
         needs.extract_new_branches.conclusion == 'success' &&
@@ -518,7 +518,7 @@ jobs:
   unprotect_main_branch:
     runs-on: [ self-hosted, Linux ]
     needs: yield_new_branches
-    if: |
+    if: >-
       ${{
         always()
       }}
