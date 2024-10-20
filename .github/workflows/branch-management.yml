@@ -41,6 +41,7 @@ jobs:
         always()
       }}
     outputs:
+      existed_branches: ${{ steps.extract_old_branches.outputs.existed_branches }}
       old_branches: ${{ steps.extract_old_branches.outputs.old_branches }}
     steps:
       - uses: actions/checkout@v4
@@ -106,6 +107,13 @@ jobs:
               }
             }
 
+            const existedBranches = [];
+            for (const branch of branches)
+            {
+              existedBranches.push(branch.name);
+            }
+
+            core.setOutput('existed_branches', JSON.stringify(existedBranches));
             core.setOutput('old_branches', JSON.stringify(oldBranches));
 
       - run: |
@@ -284,11 +292,12 @@ jobs:
           git push origin main
 
   extract_new_branches:
-    needs: [ merge_old_branches ]
+    needs: [ extract_old_branches, merge_old_branches ]
     runs-on: [ self-hosted, Linux ]
     if: >-
       ${{ 
         always() &&
+        needs.extract_old_branches.result != 'failure' &&
         needs.merge_old_branches.result != 'failure'
       }}
     outputs:
@@ -317,34 +326,27 @@ jobs:
             const config = yaml.load(fs.readFileSync('config.yaml', 'utf8'));
             const currentTime = new Date();
 
-            const { data: branches } = await github.rest.repos.listBranches({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              per_page: 100
-            });
+            const existedBranches = '${{ needs.extract_old_branches.outputs.existed_branches }}' === '' ? [] : JSON.parse('${{ needs.extract_old_branches.outputs.existed_branches }}');
+            const failedBaseNames = '${{ needs.merge_old_branches.outputs.failed_base_names }}' === '' ? [] : JSON.parse('${{ needs.merge_old_branches.outputs.failed_base_names }}');
 
             const newBranches = [];
-
-            // Get merged_base_names from job outputs
-            const mergedBaseNames = '${{ needs.merge_old_branches.outputs.merged_base_names }}' === '' ? [] : JSON.parse('${{ needs.merge_old_branches.outputs.merged_base_names }}');
-
             for (const branchConfig of config.branches)
             {
               const baseName = branchConfig.name;
 
-              // マージが成功したブランチに対してのみ新しいブランチを作成
-              if (mergedBaseNames.includes(baseName))
+              // マージに失敗したブランチ以外をすべて新しいブランチとして作成
+              if (!failedBaseNames.includes(baseName))
               {
                 // 既存のブランチから最大番号を取得
-                const existingNumbers = branches
+                const existedNumbers = existedBranches
                   .filter(b => b.name.startsWith(`${baseName}/${branchConfig.status}-`))
                   .map(b => parseInt(b.name.split(`${baseName}/${branchConfig.status}-`)[1], 10))
                   .filter(n => !isNaN(n));
 
                 // 最終番号を取得またはリセット
                 let nextNumber = 1;
-                if (existingNumbers.length > 0) {
-                  nextNumber = Math.max(...existingNumbers) + 1;
+                if (existedNumbers.length > 0) {
+                  nextNumber = Math.max(...existedNumbers) + 1;
                 }
 
                 newBranches.push(`${baseName}/${branchConfig.status}-${nextNumber}`);
