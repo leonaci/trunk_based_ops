@@ -1,6 +1,6 @@
 scene1:
-  branch_name: scene1/mock-7
-  timestamp: '2024-10-20T10:25:11.710Z'
+  branch_name: scene1/mock-NaN
+  timestamp: '2024-10-20T10:50:37.871Z'
   status: mock
   schedule:
     - '2024-10-20T11:00:00.000Z'
@@ -41,8 +41,8 @@ scene1:
     - '2024-10-21T22:00:00.000Z'
     - '2024-10-21T23:00:00.000Z'
 scene2/cut1:
-  branch_name: scene2/cut1/feature-7
-  timestamp: '2024-10-20T10:25:11.710Z'
+  branch_name: scene2/cut1/feature-NaN
+  timestamp: '2024-10-20T10:50:37.871Z'
   status: feature
   schedule:
     - '2024-10-20T11:00:00.000Z'
