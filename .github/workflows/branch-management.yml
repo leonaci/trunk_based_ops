@@ -351,7 +351,7 @@ jobs:
               }
 
               let schedules = branchStatus[baseName].schedules;
-              const originalLength = schedule.length;
+              const originalLength = schedules.length;
 
               // 古くなったスケジュールを削除
               schedules = schedules.filter(schedule => now <= new Date(schedule));
