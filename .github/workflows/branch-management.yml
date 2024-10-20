@@ -7,6 +7,33 @@ on:
   workflow_dispatch:
 
 jobs:
+  protect_main_branch:
+    runs-on: [ self-hosted, Linux ]
+    if: |
+      ${{
+        always()
+      }}
+    steps:
+      - name: Protect main branch
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.BRANCH_MANAGE_TOKEN }}
+          script: |
+            await github.rest.repos.updateBranchProtection({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              branch: 'main',
+              required_status_checks: {
+                strict: true,
+                contexts: []
+              },
+              enforce_admins: true,
+              required_pull_request_reviews: {
+                dismiss_stale_reviews: true
+              },
+              restrictions: null
+            });
+
   extract_old_branches:
     runs-on: [ self-hosted, Linux ]
     if: |
@@ -84,35 +111,8 @@ jobs:
       - run: |
           echo "Old branches: ${{ steps.extract_old_branches.outputs.old_branches }}"
 
-  protect_main_branch:
-    runs-on: [ self-hosted, Linux ]
-    if: |
-      ${{
-        always()
-      }}
-    steps:
-      - name: Protect main branch
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            await github.rest.repos.updateBranchProtection({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              branch: 'main',
-              required_status_checks: {
-                strict: true,
-                contexts: []
-              },
-              enforce_admins: true,
-              required_pull_request_reviews: {
-                dismiss_stale_reviews: true
-              },
-              restrictions: null
-            });
-
   merge_old_branches:
-    needs: [ extract_old_branches, protect_main_branch ]
+    needs: [ protect_main_branch, extract_old_branches ]
     runs-on: [ self-hosted, Linux ]
     if: |
       ${{
