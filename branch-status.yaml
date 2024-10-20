@@ -42,7 +42,7 @@ scene1:
     - '2024-10-21T22:00:00.000Z'
     - '2024-10-21T23:00:00.000Z'
 scene2/cut1:
-  branch_name: scene2/cut1/feature-NaN
+  branch_name: scene2/cut1/feature-7
   timestamp: '2024-10-20T11:20:40.078Z'
   status: feature
   schedule:
