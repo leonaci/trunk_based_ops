@@ -342,7 +342,7 @@ jobs:
               else if (mergedBaseNames.includes(baseName))
               {
                 const branchName = branchStatus[baseName].branch_name;
-                const nextNumber = parseInt(branchName.replace(`${baseName}/${status}-(\\d+)`, '$1'), 10)) + 1;
+                const nextNumber = parseInt(branchName.replace(`${baseName}/${status}-(\\d+)`, '$1'), 10) + 1;
 
                 newBranches.push(`${baseName}/${status}-${nextNumber}`);
               }
