@@ -80,6 +80,8 @@ jobs:
 
             {
               const currentTime = new Date();
+              const now = new Date(currentTime.getTime() - (currentTime.getTime() % (60 * 60 * 1000)));
+              const oneHourLater = new Date(currentTime.getTime() - (currentTime.getTime() % (60 * 60 * 1000)) + 60 * 60 * 1000);
 
               const targetBranches = [];
 
@@ -96,9 +98,6 @@ jobs:
                     console.log(`Invalid scheduledTime: ${scheduledTime}`);
                     continue;
                   }
-
-                  const now = new Date(currentTime.getTime() - (currentTime.getTime() % (60 * 60 * 1000)));
-                  const oneHourLater = new Date(currentTime.getTime() - (currentTime.getTime() % (60 * 60 * 1000)) + 60 * 60 * 1000);
 
                   if (now <= scheduledDate && scheduledDate < oneHourLater)
                   {
@@ -201,94 +200,6 @@ jobs:
           echo "Merged base names: ${{ steps.merge_branches.outputs.merged_base_names }}"
           echo "Failed base names: ${{ steps.merge_branches.outputs.failed_base_names }}"
 
-      - run: git checkout $BASE_BRANCH
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - run: npm install js-yaml
-
-      - name: Re-Schedule
-        id: re_schedule
-        if: ${{ always() }}
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const fs = require('fs');
-            const yaml = require('js-yaml');
-
-            const branchStatusPath = '${{ env.BRANCH_STATUS_PATH }}';
-
-            // Load existing ${{ env.BRANCH_STATUS_PATH }} if it exists
-            let branchStatus = {};
-            if (fs.existsSync(branchStatusPath))
-            {
-              branchStatus = yaml.load(fs.readFileSync(branchStatusPath, 'utf8'));
-            }
-
-            const failedBaseNames = '${{ steps.merge_branches.outputs.failed_base_names }}' === '' ? [] : JSON.parse('${{ steps.merge_branches.outputs.failed_base_names }}');
-
-            const currentTime = new Date();
-            const oneHourLater = new Date(currentTime.getTime() - (currentTime.getTime() % (60 * 60 * 1000)) + 60 * 60 * 1000).toISOString();
-
-            let modified = false;
-
-            for (const baseName in branchStatus)
-            {
-              let schedule = branchStatus[baseName].schedule;
-              const originalLength = schedule.length;
-
-              // 古くなったスケジュールを削除
-              schedule = schedule.filter(scheduleTime => new Date(oneHourLater) <= new Date(scheduleTime));
-
-              if (schedule.length !== originalLength)
-              {
-                modified = true;
-                console.log(`Removed schedules older than one day for ${baseName}`);
-              }
-
-              // 失敗したブランチに対してリトライをスケジュール
-              if (failedBaseNames.includes(baseName))
-              {
-                if (!schedule.includes(oneHourLater))
-                {
-                  schedule.push(oneHourLater);
-                  console.log(`Scheduled retry for ${baseName} at ${oneHourLater}`);
-                  modified = true;
-                }
-                else
-                {
-                  console.log(`Retry already scheduled for ${baseName} at ${oneHourLater}`);
-                }
-              }
-
-              // スケジュールを時間順にソート
-              schedule.sort((a, b) => new Date(a) - new Date(b));
-
-              branchStatus[baseName].schedule = schedule;
-            }
-
-            if (modified)
-            {
-              fs.writeFileSync(branchStatusPath, yaml.dump(branchStatus));
-            }
-
-            core.setOutput('branch_status_modified', modified ? 'true' : 'false');  // 変更があったかを出力
-
-      - name: Commit and Push ${{ env.BRANCH_STATUS_PATH }}
-        if: ${{ steps.re_schedule.outputs.branch_status_modified == 'true' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-
-          git add $BRANCH_STATUS_PATH
-          git commit -m "Update $BRANCH_STATUS_PATH for re-scheduling" || echo "No changes to commit"
-          git push origin $BASE_BRANCH
-
   extract_new_branches:
     needs: [ extract_old_branches, merge_old_branches ]
     runs-on: [ self-hosted, Linux ]
@@ -342,7 +253,7 @@ jobs:
               else if (mergedBaseNames.includes(baseName))
               {
                 const branchName = branchStatus[baseName].branch_name;
-                const nextNumber = parseInt(branchName.replace(`${baseName}/${status}-(\\d+)`, '$1'), 10) + 1;
+                const nextNumber = parseInt(branchName.replace(new RegExp(`^${baseName}/${status}-(\\d+)$`), '$1'), 10) + 1;
 
                 newBranches.push(`${baseName}/${status}-${nextNumber}`);
               }
@@ -354,11 +265,12 @@ jobs:
           echo "New branches after filtering: ${{ steps.extract_new_branches.outputs.new_branches }}"
 
   update_branch_status:
-    needs: [ extract_new_branches ]
+    needs: [ merge_old_branches, extract_new_branches ]
     runs-on: [ self-hosted, Linux ]
     if: >-
       ${{
         always() &&
+        needs.merge_old_branches.result != 'failure' &&
         needs.extract_new_branches.result == 'success' &&
         needs.extract_new_branches.outputs.new_branches && 
         needs.extract_new_branches.outputs.new_branches != '[]'
@@ -392,19 +304,66 @@ jobs:
               branchStatus = yaml.load(fs.readFileSync(branchStatusPath, 'utf8'));
             }
 
-            // Get new branches from job outputs
+            const failedBaseNames = '${{ needs.merge_old_branches.outputs.failed_base_names }}' === '' ? [] : JSON.parse('${{ needs.merge_old_branches.outputs.failed_base_names }}');
             const newBranches = JSON.parse('${{ needs.extract_new_branches.outputs.new_branches }}');
 
-            const currentTime = new Date().toISOString();
+            const currentTime = new Date();
+            const now = new Date(currentTime.getTime() - (currentTime.getTime() % (60 * 60 * 1000)));
 
-            for (const branch of newBranches)
+            const currentTimeString = currentTime.toISOString();
+            const oneHourLater = new Date(currentTime.getTime() - (currentTime.getTime() % (60 * 60 * 1000)) + 60 * 60 * 1000);
+
+            const oneHourLaterString = oneHourLater.toISOString();
+
+            for (const baseName in branchStatus)
             {
-              const baseName = branch.replace(/\/[^/]+$/, '');
+              const newBranch = newBranches.find(b => b.startsWith(baseName));
+              if (newBranch)
+              {
+                const oldBranch = branchStatus[baseName].branch_name;
 
-              branchStatus[baseName].branch_name = branch;
-              branchStatus[baseName].timestamp = currentTime;
+                branchStatus[baseName].branch_name = newBranch;
+                branchStatus[baseName].timestamp = currentTimeString;
 
-              console.log(`Updated entry for branch: ${branch}`);
+                if (oldBranch)
+                {
+                  console.log(`Updated branch for \`${baseName}\` from \`${oldBranch}\` to \`${newBranch}\``);
+                }
+                else
+                {
+                  console.log(`Created branch for \`${baseName}\` as \`${newBranch}\``);
+                }
+              }
+
+              let schedule = branchStatus[baseName].schedule;
+              const originalLength = schedule.length;
+
+              // 古くなったスケジュールを削除
+              schedule = schedule.filter(scheduleTime => now <= new Date(scheduleTime));
+
+              if (schedule.length !== originalLength)
+              {
+                console.log(`Removed schedules older than one day for ${baseName}`);
+              }
+
+              // 失敗したブランチに対してリトライをスケジュール
+              if (failedBaseNames.includes(baseName))
+              {
+                if (!schedule.includes(oneHourLaterString))
+                {
+                  schedule.push(oneHourLaterString);
+                  console.log(`Scheduled retry for ${baseName} at ${oneHourLaterString}`);
+                }
+                else
+                {
+                  console.log(`Retry already scheduled for ${baseName} at ${oneHourLaterString}`);
+                }
+              }
+
+              // スケジュールを時間順にソート
+              schedule.sort((a, b) => new Date(a) - new Date(b));
+
+              branchStatus[baseName].schedule = schedule;
             }
 
             fs.writeFileSync(branchStatusPath, yaml.dump(branchStatus));
@@ -462,7 +421,6 @@ jobs:
           git commit --allow-empty -m "Create $BRANCH branch"
           git push origin "$BRANCH"
           
-
   delete_lock:
     runs-on: [ self-hosted, Linux ]
     needs: yield_new_branches
