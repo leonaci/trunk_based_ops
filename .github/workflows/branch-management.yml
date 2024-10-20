@@ -54,8 +54,6 @@ jobs:
       existed_branches: ${{ steps.extract_old_branches.outputs.existed_branches }}
       old_branches: ${{ steps.extract_old_branches.outputs.old_branches }}
     steps:
-      - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -310,10 +308,6 @@ jobs:
     outputs:
       new_branches: ${{ steps.extract_new_branches.outputs.new_branches }}
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
