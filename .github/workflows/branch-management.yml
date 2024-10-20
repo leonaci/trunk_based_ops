@@ -261,7 +261,7 @@ jobs:
             const newBranches = [];
             for (const baseName in branchStatus)
             {
-              const status = branchStatus[baseName].status;
+              const type = branchStatus[baseName].type;
 
               const existed = branchStatus[baseName].hasOwnProperty('branch_name');
 
@@ -277,7 +277,7 @@ jobs:
                   nextNumber = parseInt(branchName.match(eReg)[1]) + 1;
                 }
 
-                newBranches.push(`${baseName}/${status}-${nextNumber}`);
+                newBranches.push(`${baseName}/${type}-${nextNumber}`);
               }
             }
 

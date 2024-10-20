@@ -1,5 +1,5 @@
 scene1:
-  status: mock
+  type: mock
   schedules:
     - '2024-10-20T13:00:00.000Z'
     - '2024-10-20T14:00:00.000Z'
@@ -39,7 +39,7 @@ scene1:
   branch_name: scene1/mock-5
   timestamp: '2024-10-20T13:27:01.557Z'
 scene2/cut1:
-  status: feature
+  type: feature
   schedules:
     - '2024-10-20T13:00:00.000Z'
     - '2024-10-20T14:00:00.000Z'
@@ -79,7 +79,7 @@ scene2/cut1:
   branch_name: scene2/cut1/feature-7
   timestamp: '2024-10-20T13:27:01.557Z'
 scene3:
-  status: fix
+  type: fix
   schedules:
     - '2024-10-20T14:00:00.000Z'
     - '2024-10-20T16:00:00.000Z'
