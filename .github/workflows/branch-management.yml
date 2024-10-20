@@ -358,7 +358,6 @@ jobs:
     runs-on: [ self-hosted, Linux ]
     if: |
       ${{
-        needs.extract_new_branches.result == 'success' &&
         needs.extract_new_branches.outputs.new_branches != '[]'
       }}
     steps:
