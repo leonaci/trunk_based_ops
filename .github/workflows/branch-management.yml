@@ -86,9 +86,11 @@ jobs:
                   continue;
                 }
 
-                const timeDiff = currentTime.getTime() - scheduledDate.getTime();
+                const now = new Date(currentTime.getTime() - (currentTime.getTime() % (60 * 60 * 1000)));
+                const oneHourLater = new Date(currentTime.getTime() - (currentTime.getTime() % (60 * 60 * 1000)) + 60 * 60 * 1000);
 
-                if (0 <= timeDiff && timeDiff < 60 * 60 * 1000) {
+                if (now <= scheduledDate && scheduledDate < oneHourLater)
+                {
                   shouldMerge = true;
                   break;
                 }
@@ -157,6 +159,9 @@ jobs:
           MERGED_BASE_NAMES=()
           FAILED_BASE_NAMES=()
 
+          echo "merged_base_names=[]" >> $GITHUB_OUTPUT
+          echo "failed_base_names=[]" >> $GITHUB_OUTPUT
+
           for BRANCH in $BRANCHES; do
             echo ""
             echo ""
@@ -185,15 +190,11 @@ jobs:
             fi
           done
 
-          if [ ${#MERGED_BASE_NAMES[@]} -eq 0 ]; then
-            echo "merged_base_names=[]" >> $GITHUB_OUTPUT
-          else
+          if [ ${#MERGED_BASE_NAMES[@]} -gt 0 ]; then
             echo "merged_base_names=$(printf '%s\n' "${MERGED_BASE_NAMES[@]}" | jq -R | jq -s | jq -c 'unique')" >> $GITHUB_OUTPUT
           fi
 
-          if [ ${#FAILED_BASE_NAMES[@]} -eq 0 ]; then
-            echo "failed_base_names=[]" >> $GITHUB_OUTPUT
-          else
+          if [ ${#FAILED_BASE_NAMES[@]} -gt 0 ]; then
             echo "failed_base_names=$(printf '%s\n' "${FAILED_BASE_NAMES[@]}" | jq -R | jq -s | jq -c 'unique')" >> $GITHUB_OUTPUT
           fi
 
@@ -234,11 +235,10 @@ jobs:
               throw new Error('config.yaml が存在しません。');
             }
 
-            const failedBaseNames = JSON.parse('${{ steps.merge_branches.outputs.failed_base_names }}');
+            const failedBaseNames = '${{ steps.merge_branches.outputs.failed_base_names }}' === '' ? [] : JSON.parse('${{ steps.merge_branches.outputs.failed_base_names }}');
 
             const currentTime = new Date();
             const oneHourLater = new Date(currentTime.getTime() - (currentTime.getTime() % (60 * 60 * 1000)) + 60 * 60 * 1000).toISOString();
-            const oneDayAgo = new Date(currentTime.getTime() - (currentTime.getTime() % (60 * 60 * 1000)) - (24 * 60 * 60 * 1000)).toISOString();
 
             let modified = false;
 
@@ -246,9 +246,9 @@ jobs:
             {
               if (failedBaseNames.includes(branchConfig.name))
               {
-                // 1日前以上の古いスケジュールを削除
+                // 古くなったスケジュールを削除
                 const originalLength = branchConfig.schedule.length;
-                branchConfig.schedule = branchConfig.schedule.filter(scheduleTime => new Date(scheduleTime) - new Date(oneDayAgo) >= 0);
+                branchConfig.schedule = branchConfig.schedule.filter(scheduleTime => new Date(oneHourLater) <= new Date(scheduleTime));
                 if (branchConfig.schedule.length !== originalLength)
                 {
                   modified = true;
