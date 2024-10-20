@@ -266,14 +266,17 @@ jobs:
               const existed = branchStatus[baseName].hasOwnProperty('branch_name');
 
               // 元から存在しなかったか、マージが成功したブランチに対してのみ新しいブランチを作成
-              if (!existed)
+              if (!existed || mergedBaseNames.includes(baseName))
               {
-                newBranches.push(`${baseName}/${status}-1`);
-              }
-              else if (mergedBaseNames.includes(baseName))
-              {
-                const branchName = branchStatus[baseName].branch_name;
-                const nextNumber = parseInt(branchName.replace(new RegExp(`^${baseName}/${status}-(\\d+)$`), '$1'), 10) + 1;
+                let nextNumber = 1;
+                if (existed)
+                {
+                  const branchName = branchStatus[baseName].branch_name;
+                  if (branchName.startsWith(`${baseName}/${status}-`))
+                  {
+                    nextNumber = parseInt(branchName.split(`${baseName}/${status}-`)[1], 10) + 1;
+                  }
+                }
 
                 newBranches.push(`${baseName}/${status}-${nextNumber}`);
               }
