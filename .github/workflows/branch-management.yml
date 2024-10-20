@@ -168,6 +168,11 @@ jobs:
           TARGET_BRANCHES='${{ needs.extract_old_branches.outputs.target_branches }}'
           BRANCHES=$(echo "$TARGET_BRANCHES" | jq -r '.[]')
 
+          if [ -z "$BRANCHES" ]; then
+            echo "No branches to merge."
+            exit 0
+          fi
+
           for BRANCH in $BRANCHES; do
             echo ""
             echo ""
