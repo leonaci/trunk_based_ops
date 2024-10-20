@@ -137,83 +137,83 @@ jobs:
         needs.extract_old_branches.outputs.target_branches && 
         needs.extract_old_branches.outputs.target_branches != '[]'
       }}
-    outputs:
-      merged_base_names: ${{ steps.merge_branches.outputs.merged_base_names }}
-      failed_base_names: ${{ steps.merge_branches.outputs.failed_base_names }}
+    strategy:
+      max-parallel: 1
+      matrix:
+        branch: ${{ fromJson(needs.extract_old_branches.outputs.target_branches) }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.BASE_BRANCH }}
           fetch-depth: 0
 
-      - name: Merge Branches Sequentially
-        id: merge_branches
+      - name: Merge Branch
+        id: merge_branch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
+        run: |
+          BRANCH="${{ matrix.branch }}"
+          echo "Merging branch: $BRANCH"
+
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+          # Fetch the branch
+          git fetch origin "$BRANCH":"$BRANCH"
+
+          # Attempt to merge
+          if git merge --no-ff --no-edit "$BRANCH"; then
+            echo "Successfully merged $BRANCH into $BASE_BRANCH."
+            echo "merged=true" >> $GITHUB_OUTPUT
+          else
+            echo "Merge conflict when merging $BRANCH into $BASE_BRANCH. Aborting merge."
+            git merge --abort
+            echo "merged=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update branch-status.yaml
+        uses: actions/github-script@v6
+        env:
+          merged: ${{ steps.merge_branch.outputs.merged }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const yaml = require('js-yaml');
+
+            const branchStatusPath = '${{ env.BRANCH_STATUS_PATH }}';
+            let branchStatus = {};
+
+            if (fs.existsSync(branchStatusPath)) {
+              branchStatus = yaml.load(fs.readFileSync(branchStatusPath, 'utf8'));
+            }
+
+            const branch = '${{ matrix.branch }}';
+            const merged = process.env.merged === 'true';
+
+            for (const baseName in branchStatus)
+            {
+              if (branchStatus[baseName].branch_name === branch)
+              {
+                branchStatus[baseName].merged = merged;
+                break;
+              }
+            }
+
+            fs.writeFileSync(branchStatusPath, yaml.dump(branchStatus));
+
+            console.log(`Updated ${branchStatusPath} with merged status for ${baseName}`);
+
+      - name: Commit and push branch-status.yaml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
 
-          # 最新のBASE_BRANCHを取得
-          git checkout $BASE_BRANCH
-          git pull origin $BASE_BRANCH
-
-          MERGED_BASE_NAMES=()
-          FAILED_BASE_NAMES=()
-
-          echo "merged_base_names=[]" >> $GITHUB_OUTPUT
-          echo "failed_base_names=[]" >> $GITHUB_OUTPUT
-
-          TARGET_BRANCHES='${{ needs.extract_old_branches.outputs.target_branches }}'
-          BRANCHES=$(echo "$TARGET_BRANCHES" | jq -r '.[]')
-
-          if [ -z "$BRANCHES" ]; then
-            echo "No branches to merge."
-            exit 0
-          fi
-
-          for BRANCH in $BRANCHES; do
-            echo ""
-            echo ""
-            echo ""
-            echo "Processing branch: $BRANCH"
-
-            BASE_NAME=$(echo "$BRANCH" | sed -E 's|/[^/]+$||')
-
-            # ブランチをフェッチ
-            git fetch origin "$BRANCH":"$BRANCH"
-
-            # ブランチをマージ
-            if git merge --no-ff --no-edit "$BRANCH"; then
-              echo "Successfully merged $BRANCH into $BASE_BRANCH."
-
-              git push origin $BASE_BRANCH
-              git branch -d "$BRANCH"
-              if [ "$DELETE_OLD_BRANCHES" == 'true' ]; then
-                git push origin --delete "$BRANCH"
-              fi
-
-              MERGED_BASE_NAMES+=("$BASE_NAME")
-            else
-              echo "Merge conflict when merging $BRANCH into $BASE_BRANCH. Aborting merge."
-
-              git merge --abort
-              FAILED_BASE_NAMES+=("$BASE_NAME")
-            fi
-          done
-
-          if [ ${#MERGED_BASE_NAMES[@]} -gt 0 ]; then
-            echo "merged_base_names=$(printf '%s\n' "${MERGED_BASE_NAMES[@]}" | jq -R | jq -s | jq -c 'unique')" >> $GITHUB_OUTPUT
-          fi
-
-          if [ ${#FAILED_BASE_NAMES[@]} -gt 0 ]; then
-            echo "failed_base_names=$(printf '%s\n' "${FAILED_BASE_NAMES[@]}" | jq -R | jq -s | jq -c 'unique')" >> $GITHUB_OUTPUT
-          fi
-
-      - run: |
-          echo "Merged base names: ${{ steps.merge_branches.outputs.merged_base_names }}"
-          echo "Failed base names: ${{ steps.merge_branches.outputs.failed_base_names }}"
+          git add $BRANCH_STATUS_PATH
+          git commit -m "Update $BRANCH_STATUS_PATH with merge result for branch ${{ matrix.branch }}" || echo "No changes to commit"
+          git push origin $BASE_BRANCH
 
   extract_new_branches:
     needs: [ extract_old_branches, merge_old_branches ]
@@ -256,17 +256,16 @@ jobs:
               return;
             }
 
-            const mergedBaseNames = '${{ needs.merge_old_branches.outputs.merged_base_names }}' === '' ? [] : JSON.parse('${{ needs.merge_old_branches.outputs.merged_base_names }}');
-
             const newBranches = [];
             for (const baseName in branchStatus)
             {
               const type = branchStatus[baseName].type;
+              const merged = branchStatus[baseName].merged;
 
               const existed = branchStatus[baseName].hasOwnProperty('branch_name');
 
               // 元から存在しなかったか、マージが成功したブランチに対してのみ新しいブランチを作成
-              if (!existed || mergedBaseNames.includes(baseName))
+              if (!existed || merged)
               {
                 let nextNumber = 1;
                 if (existed)
@@ -326,7 +325,6 @@ jobs:
               branchStatus = yaml.load(fs.readFileSync(branchStatusPath, 'utf8'));
             }
 
-            const failedBaseNames = '${{ needs.merge_old_branches.outputs.failed_base_names }}' === '' ? [] : JSON.parse('${{ needs.merge_old_branches.outputs.failed_base_names }}');
             const newBranches = JSON.parse('${{ needs.extract_new_branches.outputs.new_branches }}');
 
             const currentTime = new Date();
@@ -346,6 +344,7 @@ jobs:
 
                 branchStatus[baseName].branch_name = newBranch;
                 branchStatus[baseName].timestamp = currentTimeString;
+                delete branchStatus[baseName].merged;
 
                 if (oldBranch)
                 {
@@ -369,7 +368,7 @@ jobs:
               }
 
               // 失敗したブランチに対してリトライをスケジュール
-              if (failedBaseNames.includes(baseName))
+              if (branchStatus[baseName].hasOwnProperty('merged') && !branchStatus[baseName].merged)
               {
                 if (!schedules.includes(oneHourLaterString))
                 {
