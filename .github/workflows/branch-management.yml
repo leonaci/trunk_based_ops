@@ -204,10 +204,7 @@ jobs:
 
       - name: Re-Schedule
         id: re_schedule
-        if: |
-          ${{
-            always()
-          }}
+        if: ${{ always() }}
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -289,8 +286,7 @@ jobs:
     runs-on: [ self-hosted, Linux ]
     if: |
       ${{ 
-        needs.merge_old_branches.result == 'success' &&
-        always()
+        needs.merge_old_branches.result == 'success'
       }}
     outputs:
       new_branches: ${{ steps.extract_new_branches.outputs.new_branches }}
@@ -363,8 +359,7 @@ jobs:
     if: |
       ${{
         needs.extract_new_branches.result == 'success' &&
-        needs.extract_new_branches.outputs.new_branches != '[]' &&
-        always()
+        needs.extract_new_branches.outputs.new_branches != '[]'
       }}
     steps:
       - uses: actions/checkout@v4
@@ -450,8 +445,7 @@ jobs:
       ${{
         needs.extract_new_branches.result == 'success' &&
         needs.extract_new_branches.outputs.new_branches != '[]' &&
-        needs.update_branch_status.result == 'success' &&
-        always()
+        needs.update_branch_status.result == 'success'
       }}
     strategy:
       fail-fast: false
