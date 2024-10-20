@@ -1,0 +1,45 @@
+# .github/actions/merge-branch/action.yml
+name: 'Merge Branch'
+description: 'Custom action to merge a branch into the base branch'
+
+inputs:
+  base_branch:
+    description: 'Base branch to merge into'
+    required: true
+  branch:
+    description: 'Branch to be merged'
+    required: true
+  github_token:
+    description: 'GitHub Token'
+    required: true
+
+outputs:
+  merged:
+    description: 'Result of the merge: true if merged successfully, false otherwise'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout base branch
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.base_branch }}
+        fetch-depth: 0
+
+    - name: Configure Git
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+
+    - name: Fetch target branch
+      run: git fetch origin "${{ inputs.branch }}:${{ inputs.branch }}"
+
+    - name: Merge branch
+      id: merge
+      run: |
+        if git merge --no-ff --no-edit "${{ inputs.branch }}"; then
+          echo "merged=true" >> $GITHUB_OUTPUT
+        else
+          echo "merged=false" >> $GITHUB_OUTPUT
+          git merge --abort
+        fi

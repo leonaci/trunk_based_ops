@@ -157,27 +157,11 @@ jobs:
 
       - name: Merge Branch
         id: merge_branch
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          BRANCH="${{ matrix.branch }}"
-          echo "Merging branch: $BRANCH"
-
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-
-          # Fetch the branch
-          git fetch origin "$BRANCH":"$BRANCH"
-
-          # Attempt to merge
-          if git merge --no-ff --no-edit "$BRANCH"; then
-            echo "Successfully merged $BRANCH into $BASE_BRANCH."
-            echo "merged=true" >> $GITHUB_OUTPUT
-          else
-            echo "Merge conflict when merging $BRANCH into $BASE_BRANCH. Aborting merge."
-            git merge --abort
-            echo "merged=false" >> $GITHUB_OUTPUT
-          fi
+        uses: ./.github/actions/merge-branch
+        with:
+          base_branch: ${{ env.BASE_BRANCH }}
+          branch: ${{ matrix.branch }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update branch-status.yaml
         uses: actions/github-script@v6
@@ -281,7 +265,10 @@ jobs:
                   const branchName = branchStatus[baseName].branch_name;
 
                   const eReg = new RegExp(`^${baseName}/\\w+-(\\d+)$`);
-                  nextNumber = parseInt(branchName.match(eReg)[1]) + 1;
+                  const match = branchName.match(eReg);
+                  if (match && match[1]) {
+                    nextNumber = parseInt(match[1], 10) + 1;
+                  }
                 }
 
                 newBranches.push(`${baseName}/${type}-${nextNumber}`);
