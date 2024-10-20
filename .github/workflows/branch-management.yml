@@ -17,7 +17,7 @@ jobs:
       - name: Protect main branch
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.BRANCH_MANAGE_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             await github.rest.repos.updateBranchProtection({
               owner: context.repo.owner,
@@ -537,7 +537,7 @@ jobs:
       - name: Remove branch protection from main
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.BRANCH_MANAGE_TOKEN }}
           script: |
             await github.rest.repos.deleteBranchProtection({
               owner: context.repo.owner,
