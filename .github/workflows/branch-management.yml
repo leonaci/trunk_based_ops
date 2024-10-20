@@ -21,8 +21,6 @@ jobs:
       ${{
         always()
       }}
-    env:
-      BASE_BRANCH: ${{ env.BASE_BRANCH }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -40,7 +38,6 @@ jobs:
       - name: Commit and push .lock file
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BASE_BRANCH: ${{ env.BASE_BRANCH }}
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
@@ -145,8 +142,6 @@ jobs:
     outputs:
       merged_base_names: ${{ steps.merge_branches.outputs.merged_base_names }}
       failed_base_names: ${{ steps.merge_branches.outputs.failed_base_names }}
-    env:
-      BASE_BRANCH: ${{ env.BASE_BRANCH }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -156,7 +151,6 @@ jobs:
         id: merge_branches
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BASE_BRANCH: ${{ env.BASE_BRANCH }}
         continue-on-error: true
         run: |
           git config user.name "GitHub Actions"
@@ -296,7 +290,6 @@ jobs:
         if: ${{ steps.re_schedule.outputs.config_modified == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BASE_BRANCH: ${{ env.BASE_BRANCH }}
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
@@ -394,8 +387,6 @@ jobs:
         needs.extract_new_branches.outputs.new_branches && 
         needs.extract_new_branches.outputs.new_branches != '[]'
       }}
-    env:
-      BASE_BRANCH: ${{ env.BASE_BRANCH }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -461,7 +452,6 @@ jobs:
         if: ${{ steps.check_update_status.outputs.updated == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BASE_BRANCH: ${{ env.BASE_BRANCH }}
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
@@ -485,8 +475,6 @@ jobs:
       fail-fast: false
       matrix:
         branch: ${{ fromJson(needs.extract_new_branches.outputs.new_branches) }}
-    env:
-      BASE_BRANCH: ${{ env.BASE_BRANCH }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -501,7 +489,6 @@ jobs:
       - name: Create new branch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BASE_BRANCH: ${{ env.BASE_BRANCH }}
         run: |
           #!/bin/bash
           set -e
@@ -549,7 +536,6 @@ jobs:
       - name: Commit and push changes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BASE_BRANCH: ${{ env.BASE_BRANCH }}
         run: |
           BRANCH="${{ matrix.branch }}"
 
@@ -564,8 +550,6 @@ jobs:
       ${{
         always()
       }}
-    env:
-      BASE_BRANCH: ${{ env.BASE_BRANCH }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -579,7 +563,6 @@ jobs:
       - name: Commit and push .lock file deletion
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BASE_BRANCH: ${{ env.BASE_BRANCH }}
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
