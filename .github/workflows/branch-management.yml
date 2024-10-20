@@ -415,6 +415,7 @@ jobs:
         needs.update_branch_status.result != 'failure'
       }}
     strategy:
+      max-parallel: 1
       fail-fast: false
       matrix:
         branch: ${{ fromJson(needs.extract_new_branches.outputs.new_branches) }}
