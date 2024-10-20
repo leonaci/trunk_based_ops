@@ -450,7 +450,7 @@ jobs:
     if: |
       ${{
         always() &&
-        needs.extract_new_branches.result = 'success' &&
+        needs.extract_new_branches.result == 'success' &&
         needs.extract_new_branches.outputs.new_branches != '[]' &&
         needs.update_branch_status.result == 'success'
       }}
