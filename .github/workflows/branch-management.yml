@@ -371,7 +371,7 @@ jobs:
       - run: |
           echo "New branches after filtering: ${{ steps.extract_new_branches.outputs.new_branches }}"
 
-  pre_update_branch_status:
+  update_branch_status:
     needs: [ extract_new_branches ]
     runs-on: [ self-hosted, Linux ]
     if: >-
@@ -394,14 +394,12 @@ jobs:
       - run: npm install js-yaml
 
       - name: Check and Update branch-status.yaml
-        id: check_update_status
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
             const yaml = require('js-yaml');
-
             const path = 'branch-status.yaml';
 
             // Load existing branch-status.yaml if it exists
@@ -414,36 +412,32 @@ jobs:
             // Get new branches from job outputs
             const newBranches = JSON.parse('${{ needs.extract_new_branches.outputs.new_branches }}');
 
-            let updated = false;
             const currentTime = new Date().toISOString();
 
             for (const branch of newBranches)
             {
               const baseName = branch.replace(/\/[^/]+$/, '');
+
               if (!branchStatus[baseName])
               {
-                branchStatus[baseName] = {
-                  branch_name: branch,
-                  timestamp: currentTime
-                };
-                updated = true;
                 console.log(`Added entry for branch: ${branch}`);
               }
+              else
+              {
+                console.log(`Updated entry for branch: ${branch}`);
+              }
+
+              branchStatus[baseName] = {
+                branch_name: branch,
+                timestamp: currentTime
+              };
             }
 
-            if (updated)
-            {
-              fs.writeFileSync(path, yaml.dump(branchStatus));
-              core.setOutput('updated', 'true');
-            }
-            else
-            {
-              console.log('No updates required for branch-status.yaml');
-              core.setOutput('updated', 'false');
-            }
+            fs.writeFileSync(path, yaml.dump(branchStatus));
+
+            console.log(`Updated ${path}`);
 
       - name: Commit and Push branch-status.yaml
-        if: ${{ steps.check_update_status.outputs.updated == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -451,11 +445,11 @@ jobs:
           git config user.email "actions@github.com"
 
           git add branch-status.yaml
-          git commit -m "Add entries to branch-status.yaml for new branches" || echo "No changes to commit"
+          git commit -m "Update branch-status.yaml for new branches" || echo "No changes to commit"
           git push origin $BASE_BRANCH
 
   yield_new_branches:
-    needs: [ extract_new_branches, pre_update_branch_status ]
+    needs: [ extract_new_branches, update_branch_status ]
     runs-on: [ self-hosted, Linux ]
     if: >-
       ${{
@@ -463,7 +457,7 @@ jobs:
         needs.extract_new_branches.result == 'success' &&
         needs.extract_new_branches.outputs.new_branches && 
         needs.extract_new_branches.outputs.new_branches != '[]' &&
-        needs.pre_update_branch_status.result != 'failure'
+        needs.update_branch_status.result != 'failure'
       }}
     strategy:
       fail-fast: false
@@ -473,12 +467,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - run: npm install js-yaml
 
       - name: Create new branch
         env:
@@ -497,42 +485,6 @@ jobs:
 
           # 新しいブランチを作成
           git checkout -b "$BRANCH"
-
-      - name: Update branch-status.yaml
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const fs = require('fs');
-            const yaml = require('js-yaml');
-            const path = 'branch-status.yaml';
-            const branch = '${{ matrix.branch }}';
-            const baseName = branch.replace(/\/[^/]+$/, '');
-            const currentTime = new Date().toISOString();
-
-            let branchStatus = {};
-            if (fs.existsSync(path)) {
-              branchStatus = yaml.load(fs.readFileSync(path, 'utf8'));
-            }
-
-            branchStatus[baseName] = {
-              branch_name: branch,
-              timestamp: currentTime
-            };
-
-            fs.writeFileSync(path, yaml.dump(branchStatus));
-
-            console.log(`Updated ${path}`);
-
-      - name: Commit and push changes
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          BRANCH="${{ matrix.branch }}"
-
-          git add branch-status.yaml
-          git commit -m "Update branch-status.yaml for $BRANCH" || echo "No changes to commit"
-          git push origin "$BRANCH"
 
   delete_lock:
     runs-on: [ self-hosted, Linux ]
