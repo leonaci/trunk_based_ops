@@ -485,6 +485,7 @@ jobs:
 
           # 新しいブランチを作成
           git checkout -b "$BRANCH"
+          git push origin "$BRANCH"
 
   delete_lock:
     runs-on: [ self-hosted, Linux ]
