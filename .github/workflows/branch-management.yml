@@ -118,8 +118,7 @@ jobs:
       ${{
         needs.protect_main_branch.result == 'success' &&
         needs.extract_old_branches.result == 'success' &&
-        needs.extract_old_branches.outputs.old_branches != '[]' &&
-        success()
+        needs.extract_old_branches.outputs.old_branches != '[]'
       }}
     outputs:
       merged_base_names: ${{ steps.merge_branches.outputs.merged_base_names }}
