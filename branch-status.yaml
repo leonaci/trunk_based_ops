@@ -1,6 +1,6 @@
 scene1:
   status: mock
-  schedule:
+  schedules:
     - '2024-10-20T11:00:00.000Z'
     - '2024-10-20T12:00:00.000Z'
     - '2024-10-20T13:00:00.000Z'
@@ -42,7 +42,7 @@ scene1:
   timestamp: '2024-10-20T11:46:49.060Z'
 scene2/cut1:
   status: feature
-  schedule:
+  schedules:
     - '2024-10-20T11:00:00.000Z'
     - '2024-10-20T12:00:00.000Z'
     - '2024-10-20T13:00:00.000Z'
@@ -83,10 +83,8 @@ scene2/cut1:
   branch_name: scene2/cut1/feature-1
   timestamp: '2024-10-20T11:46:49.060Z'
 scene3:
-  branch_name: scene3/fix-1
-  timestamp: '2024-10-19T12:32:47.774Z'
   status: fix
-  schedule:
+  schedules:
     - '2024-10-20T12:00:00.000Z'
     - '2024-10-20T14:00:00.000Z'
     - '2024-10-20T16:00:00.000Z'
@@ -105,3 +103,5 @@ scene3:
     - '2024-10-21T18:00:00.000Z'
     - '2024-10-21T20:00:00.000Z'
     - '2024-10-21T22:00:00.000Z'
+  branch_name: scene3/fix-1
+  timestamp: '2024-10-19T12:32:47.774Z'

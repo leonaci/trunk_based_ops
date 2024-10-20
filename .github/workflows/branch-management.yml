@@ -92,19 +92,23 @@ jobs:
 
               // branchStatusのキーと値を取得
               for (const baseName in branchStatus) {
+                if (!branchStatus.hasOwnProperty(baseName)) {
+                  continue;
+                }
+
                 const branchName = branchStatus[baseName].branch_name;
-                const schedule = branchStatus[baseName].schedule;
+                const schedules = branchStatus[baseName].schedules;
 
                 let shouldMerge = false;
-                for (const scheduledTime of schedule) {
-                  const scheduledDate = new Date(scheduledTime);
+                for (const schedule of schedules) {
+                  const scheduledTime = new Date(schedule);
 
-                  if (isNaN(scheduledDate)) {
-                    console.log(`Invalid scheduledTime: ${scheduledTime}`);
+                  if (isNaN(scheduledTime)) {
+                    console.log(`Invalid schedule: ${schedule}`);
                     continue;
                   }
 
-                  if (now <= scheduledDate && scheduledDate < oneHourLater)
+                  if (now <= scheduledTime && scheduledTime < oneHourLater)
                   {
                     shouldMerge = true;
                     break;
@@ -139,6 +143,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ env.BASE_BRANCH }}
           fetch-depth: 0
 
       - name: Merge Branches Sequentially
@@ -217,6 +222,11 @@ jobs:
     outputs:
       new_branches: ${{ steps.extract_new_branches.outputs.new_branches }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.BASE_BRANCH }}
+          fetch-depth: 0
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -340,13 +350,13 @@ jobs:
                 }
               }
 
-              let schedule = branchStatus[baseName].schedule;
+              let schedules = branchStatus[baseName].schedules;
               const originalLength = schedule.length;
 
               // 古くなったスケジュールを削除
-              schedule = schedule.filter(scheduleTime => now <= new Date(scheduleTime));
+              schedules = schedules.filter(schedule => now <= new Date(schedule));
 
-              if (schedule.length !== originalLength)
+              if (schedules.length !== originalLength)
               {
                 console.log(`Removed schedules older than one day for ${baseName}`);
               }
@@ -354,9 +364,9 @@ jobs:
               // 失敗したブランチに対してリトライをスケジュール
               if (failedBaseNames.includes(baseName))
               {
-                if (!schedule.includes(oneHourLaterString))
+                if (!schedules.includes(oneHourLaterString))
                 {
-                  schedule.push(oneHourLaterString);
+                  schedules.push(oneHourLaterString);
                   console.log(`Scheduled retry for ${baseName} at ${oneHourLaterString}`);
                 }
                 else
@@ -366,9 +376,9 @@ jobs:
               }
 
               // スケジュールを時間順にソート
-              schedule.sort((a, b) => new Date(a) - new Date(b));
+              schedules.sort((a, b) => new Date(a) - new Date(b));
 
-              branchStatus[baseName].schedule = schedule;
+              branchStatus[baseName].schedules = schedules;
             }
 
             fs.writeFileSync(branchStatusPath, yaml.dump(branchStatus));
@@ -404,6 +414,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ env.BASE_BRANCH }}
           fetch-depth: 0
 
       - name: Create new branch
