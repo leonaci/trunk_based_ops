@@ -184,7 +184,6 @@ jobs:
 
               git push origin $BASE_BRANCH
               git branch -d "$BRANCH"
-              git push origin --delete "$BRANCH"
 
               MERGED_BASE_NAMES+=("$BASE_NAME")
             else
