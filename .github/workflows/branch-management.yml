@@ -338,7 +338,10 @@ jobs:
               if (!failedBaseNames.includes(baseName))
               {
                 // 既存のブランチから最大番号を取得
-                const existedNumbers = [];
+                const existedNumbers = existedBranches
+                  .filter(b => b.startsWith(`${baseName}/${branchConfig.status}-`))
+                  .map(b => parseInt(b.split(`${baseName}/${branchConfig.status}-`)[1], 10))
+                  .filter(n => !isNaN(n));
 
                 // 最終番号を取得またはリセット
                 let nextNumber = 1;
