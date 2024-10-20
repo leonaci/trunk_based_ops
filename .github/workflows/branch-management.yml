@@ -210,7 +210,7 @@ jobs:
 
             fs.writeFileSync(branchStatusPath, yaml.dump(branchStatus));
 
-            console.log(`Updated ${branchStatusPath} with merged status for ${baseName}`);
+            console.log(`Updated ${branchStatusPath} with merged status for branch ${branch}`);
 
       - name: Commit and push branch-status.yaml
         env:
