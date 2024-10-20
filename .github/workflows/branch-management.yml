@@ -123,6 +123,7 @@ jobs:
             core.setOutput('old_branches', JSON.stringify(oldBranches));
 
       - run: |
+          echo "Existed branches: ${{ steps.extract_old_branches.outputs.existed_branches }}"
           echo "Old branches: ${{ steps.extract_old_branches.outputs.old_branches }}"
 
   merge_old_branches:
@@ -331,15 +332,27 @@ jobs:
             const currentTime = new Date();
 
             const existedBranches = '${{ needs.extract_old_branches.outputs.existed_branches }}' === '' ? [] : JSON.parse('${{ needs.extract_old_branches.outputs.existed_branches }}');
-            const failedBaseNames = '${{ needs.merge_old_branches.outputs.failed_base_names }}' === '' ? [] : JSON.parse('${{ needs.merge_old_branches.outputs.failed_base_names }}');
+            const mergedBaseNames = '${{ needs.merge_old_branches.outputs.merged_base_names }}' === '' ? [] : JSON.parse('${{ needs.merge_old_branches.outputs.merged_base_names }}');
 
             const newBranches = [];
             for (const branchConfig of config.branches)
             {
               const baseName = branchConfig.name;
 
-              // マージに失敗したブランチ以外をすべて新しいブランチとして作成
-              if (!failedBaseNames.includes(baseName))
+              const existed = false;
+              for (const branch of existedBranches)
+              {
+                const existBaseName = branch.replace(/\/[^/]+$/, '');
+
+                if (existBaseName === baseName)
+                {
+                  existed = true;
+                  break;
+                }
+              }
+
+              // 元から存在しなかったか、マージが成功したブランチに対してのみ新しいブランチを作成
+              if (!existed || mergedBaseNames.includes(baseName))
               {
                 // 既存のブランチから最大番号を取得
                 const existedNumbers = existedBranches
