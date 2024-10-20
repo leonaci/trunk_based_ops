@@ -55,6 +55,11 @@ jobs:
     outputs:
       target_branches: ${{ steps.extract_old_branches.outputs.target_branches }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.BASE_BRANCH }}
+          fetch-depth: 0
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
