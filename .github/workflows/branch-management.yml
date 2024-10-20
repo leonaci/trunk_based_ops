@@ -339,7 +339,7 @@ jobs:
             {
               const baseName = branchConfig.name;
 
-              const existed = false;
+              let existed = false;
               for (const branch of existedBranches)
               {
                 const existBaseName = branch.replace(/\/[^/]+$/, '');
