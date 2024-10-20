@@ -1,5 +1,4 @@
-# .github/actions/merge-branch/action.yml
-name: 'Merge Branch'
+name: Merge Branch
 description: 'Custom action to merge a branch into the base branch'
 
 inputs:
@@ -26,17 +25,14 @@ runs:
         ref: ${{ inputs.base_branch }}
         fetch-depth: 0
 
-    - name: Configure Git
+    - name: Merge branch
+      shell: bash
       run: |
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
 
-    - name: Fetch target branch
-      run: git fetch origin "${{ inputs.branch }}:${{ inputs.branch }}"
+        git fetch origin "${{ inputs.branch }}:${{ inputs.branch }}"
 
-    - name: Merge branch
-      id: merge
-      run: |
         if git merge --no-ff --no-edit "${{ inputs.branch }}"; then
           echo "merged=true" >> $GITHUB_OUTPUT
         else
