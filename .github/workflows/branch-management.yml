@@ -84,40 +84,40 @@ jobs:
       - run: |
           echo "Old branches: ${{ steps.extract_old_branches.outputs.old_branches }}"
 
-  create_lock:
+  protect_main_branch:
     runs-on: [ self-hosted, Linux ]
     if: |
       ${{
         always()
       }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Protect main branch
+        uses: actions/github-script@v6
         with:
-          ref: main
-          fetch-depth: 0
-
-      - name: Create .lock file
-        run: |
-          touch .lock
-
-      - name: Commit and push .lock file
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-
-          git add .lock
-          git commit -m "Lock the repository for automatic branch management" || echo "No changes to commit"
-          git push origin main
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.repos.updateBranchProtection({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              branch: 'main',
+              required_status_checks: {
+                strict: true,
+                contexts: []
+              },
+              enforce_admins: true,
+              required_pull_request_reviews: {
+                dismiss_stale_reviews: true
+              },
+              restrictions: null
+            });
 
   merge_old_branches:
-    needs: [ extract_old_branches, create_lock ]
+    needs: [ extract_old_branches, protect_main_branch ]
     runs-on: [ self-hosted, Linux ]
     if: |
       ${{
         ! failure() &&
-        needs.create_lock.result == 'success' &&
+        needs.protect_main_branch.result == 'success' &&
         needs.extract_old_branches.result == 'success' &&
         needs.extract_old_branches.outputs.old_branches && fromJson(needs.extract_old_branches.outputs.old_branches).length > 0
       }}
@@ -522,7 +522,7 @@ jobs:
           git commit -m "Update branch-status.yaml for $BRANCH"
           git push origin "$BRANCH"
 
-  delete_lock:
+  unprotect_main_branch:
     runs-on: [ self-hosted, Linux ]
     needs: yield_new_branches
     if: |
@@ -530,22 +530,14 @@ jobs:
         always()
       }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Remove branch protection from main
+        uses: actions/github-script@v6
         with:
-          ref: main
-          fetch-depth: 0
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.repos.deleteBranchProtection({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              branch: 'main'
+            });
 
-      - name: Delete .lock file
-        run: |
-          rm -f .lock
-
-      - name: Commit and push .lock file deletion
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-
-          git add .lock
-          git commit -m "Unlock the repository after automatic branch management" || echo "No changes to commit"
-          git push origin main
