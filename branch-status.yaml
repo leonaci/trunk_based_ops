@@ -2,8 +2,8 @@ scene1:
   branch_name: scene1/mock-3
   timestamp: '2024-10-20T08:05:02.187Z'
 scene2/cut1:
-  branch_name: scene2/cut1/feature-2
-  timestamp: '2024-10-20T07:56:09.865Z'
+  branch_name: scene2/cut1/feature-3
+  timestamp: '2024-10-20T08:04:40.080Z'
 scene3:
   branch_name: scene3/feature-1019
   timestamp: '2024-10-19T12:32:47.774Z'
