@@ -37,6 +37,7 @@ scene1:
     - '2024-10-21T23:00:00.000Z'
   branch_name: scene1/mock-6
   timestamp: '2024-10-20T14:21:40.511Z'
+  merged: true
 scene2/cut1:
   type: feature
   schedules:
