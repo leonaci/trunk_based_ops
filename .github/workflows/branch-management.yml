@@ -237,7 +237,7 @@ jobs:
 
             for (const baseName in branchStatus)
             {
-              const schedule = branchStatus[baseName].schedule;
+              let schedule = branchStatus[baseName].schedule;
               const originalLength = schedule.length;
 
               // 古くなったスケジュールを削除
