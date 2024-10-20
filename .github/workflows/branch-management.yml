@@ -149,12 +149,6 @@ jobs:
           ref: ${{ env.BASE_BRANCH }}
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - run: npm install js-yaml
-
       - name: Merge Branch
         id: merge_branch
         uses: ./.github/actions/merge-branch
@@ -162,6 +156,12 @@ jobs:
           base_branch: ${{ env.BASE_BRANCH }}
           branch: ${{ matrix.branch }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm install js-yaml
 
       - name: Update branch-status.yaml
         uses: actions/github-script@v6
