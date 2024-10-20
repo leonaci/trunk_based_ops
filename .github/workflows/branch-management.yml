@@ -116,10 +116,10 @@ jobs:
     runs-on: [ self-hosted, Linux ]
     if: |
       ${{
-        always() &&
         needs.protect_main_branch.result == 'success' &&
         needs.extract_old_branches.result == 'success' &&
-        needs.extract_old_branches.outputs.old_branches != '[]'
+        needs.extract_old_branches.outputs.old_branches != '[]' &&
+        always()
       }}
     outputs:
       merged_base_names: ${{ steps.merge_branches.outputs.merged_base_names }}
@@ -290,8 +290,8 @@ jobs:
     runs-on: [ self-hosted, Linux ]
     if: |
       ${{ 
-        always() &&
-        needs.merge_old_branches.result == 'success'
+        needs.merge_old_branches.result == 'success' &&
+        always()
       }}
     outputs:
       new_branches: ${{ steps.extract_new_branches.outputs.new_branches }}
@@ -363,9 +363,9 @@ jobs:
     runs-on: [ self-hosted, Linux ]
     if: |
       ${{
-        always() &&
         needs.extract_new_branches.result == 'success' &&
-        needs.extract_new_branches.outputs.new_branches != '[]' 
+        needs.extract_new_branches.outputs.new_branches != '[]' &&
+        always()
       }}
     steps:
       - uses: actions/checkout@v4
@@ -449,10 +449,10 @@ jobs:
     runs-on: [ self-hosted, Linux ]
     if: |
       ${{
-        always() &&
         needs.extract_new_branches.result == 'success' &&
         needs.extract_new_branches.outputs.new_branches != '[]' &&
-        needs.update_branch_status.result == 'success'
+        needs.update_branch_status.result == 'success' &&
+        always()
       }}
     strategy:
       fail-fast: false
