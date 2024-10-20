@@ -70,7 +70,7 @@ jobs:
             const fs = require('fs');
             const yaml = require('js-yaml');
 
-            const branchStatusPath = ${{ env.BRANCH_STATUS_PATH }};
+            const branchStatusPath = '${{ env.BRANCH_STATUS_PATH }}';
             const branchStatus = yaml.load(fs.readFileSync(branchStatusPath, 'utf8'));
             if (!branchStatus)
             {
