@@ -9,10 +9,6 @@ on:
 jobs:
   protect_main_branch:
     runs-on: [ self-hosted, Linux ]
-    if: |
-      ${{
-        always()
-      }}
     steps:
       - name: Protect main branch
         uses: actions/github-script@v6
@@ -36,10 +32,6 @@ jobs:
 
   extract_old_branches:
     runs-on: [ self-hosted, Linux ]
-    if: |
-      ${{
-        always()
-      }}
     outputs:
       old_branches: ${{ steps.extract_old_branches.outputs.old_branches }}
     steps:
