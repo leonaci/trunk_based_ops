@@ -326,7 +326,7 @@ jobs:
             const newBranches = [];
 
             // Get merged_base_names from job outputs
-            const mergedBaseNames = JSON.parse('${{ needs.merge_old_branches.outputs.merged_base_names }}');
+            const mergedBaseNames = '${{ needs.merge_old_branches.outputs.merged_base_names }}' === '' ? [] : JSON.parse('${{ needs.merge_old_branches.outputs.merged_base_names }}');
 
             for (const branchConfig of config.branches)
             {
@@ -356,7 +356,7 @@ jobs:
       - run: |
           echo "New branches after filtering: ${{ steps.extract_new_branches.outputs.new_branches }}"
 
-  update_branch_status:
+  pre_update_branch_status:
     needs: [ extract_new_branches ]
     runs-on: [ self-hosted, Linux ]
     if: >-
@@ -444,7 +444,7 @@ jobs:
           git push origin main
 
   yield_new_branches:
-    needs: [ extract_new_branches, update_branch_status ]
+    needs: [ extract_new_branches, pre_update_branch_status ]
     runs-on: [ self-hosted, Linux ]
     if: >-
       ${{
@@ -452,7 +452,7 @@ jobs:
         needs.extract_new_branches.result == 'success' &&
         needs.extract_new_branches.outputs.new_branches && 
         needs.extract_new_branches.outputs.new_branches != '[]' &&
-        needs.update_branch_status.result != 'failure'
+        needs.pre_update_branch_status.result != 'failure'
       }}
     strategy:
       fail-fast: false
