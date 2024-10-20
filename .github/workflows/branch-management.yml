@@ -7,32 +7,36 @@ on:
   workflow_dispatch:
 
 jobs:
-  protect_main_branch:
+  create_lock:
     runs-on: [ self-hosted, Linux ]
     if: >-
       ${{
         always()
       }}
     steps:
-      - name: Protect main branch
-        uses: actions/github-script@v6
+      - uses: actions/checkout@v4
         with:
-          github-token: ${{ secrets.BRANCH_MANAGE_TOKEN }}
-          script: |
-            await github.rest.repos.updateBranchProtection({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              branch: 'main',
-              required_status_checks: {
-                strict: true,
-                contexts: []
-              },
-              enforce_admins: true,
-              required_pull_request_reviews: {
-                dismiss_stale_reviews: true
-              },
-              restrictions: null
-            });
+          ref: main
+          fetch-depth: 0
+
+      - name: Create .lock file
+        run: |
+          if [ -f .lock ]; then
+            echo ".lock file already exists. Exiting."
+            exit 1
+          fi
+          touch .lock
+
+      - name: Commit and push .lock file
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+          git add .lock
+          git commit -m "Lock the repository for automatic branch management" || echo "No changes to commit"
+          git push origin main
 
   extract_old_branches:
     runs-on: [ self-hosted, Linux ]
@@ -56,7 +60,7 @@ jobs:
         id: extract_old_branches
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.BRANCH_MANAGE_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           result-encoding: json
           script: |
             const fs = require('fs');
@@ -122,12 +126,12 @@ jobs:
           echo "Old branches: ${{ steps.extract_old_branches.outputs.old_branches }}"
 
   merge_old_branches:
-    needs: [ protect_main_branch, extract_old_branches ]
+    needs: [ create_lock, extract_old_branches ]
     runs-on: [ self-hosted, Linux ]
     if: >-
       ${{
         always() &&
-        needs.protect_main_branch.result == 'success' &&
+        needs.create_lock.result == 'success' &&
         needs.extract_old_branches.result == 'success' &&
         needs.extract_old_branches.outputs.old_branches && 
         needs.extract_old_branches.outputs.old_branches != '[]'
@@ -143,7 +147,7 @@ jobs:
       - name: Merge Branches Sequentially
         id: merge_branches
         env:
-          GITHUB_TOKEN: ${{ secrets.BRANCH_MANAGE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
         run: |
           git config user.name "GitHub Actions"
@@ -218,7 +222,7 @@ jobs:
         if: ${{ always() }}
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.BRANCH_MANAGE_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
             const yaml = require('js-yaml');
@@ -282,7 +286,7 @@ jobs:
       - name: Commit and push config.yaml
         if: ${{ steps.re_schedule.outputs.config_modified == 'true' }}
         env:
-          GITHUB_TOKEN: ${{ secrets.BRANCH_MANAGE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
@@ -317,7 +321,7 @@ jobs:
         id: extract_new_branches
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.BRANCH_MANAGE_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           result-encoding: json
           script: |
             const fs = require('fs');
@@ -384,7 +388,7 @@ jobs:
         id: check_update_status
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.BRANCH_MANAGE_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
             const yaml = require('js-yaml');
@@ -432,7 +436,7 @@ jobs:
       - name: Commit and Push branch-status.yaml
         if: ${{ steps.check_update_status.outputs.updated == 'true' }}
         env:
-          GITHUB_TOKEN: ${{ secrets.BRANCH_MANAGE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           #!/bin/bash
           set -e
@@ -473,7 +477,7 @@ jobs:
 
       - name: Create new branch
         env:
-          GITHUB_TOKEN: ${{ secrets.BRANCH_MANAGE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           #!/bin/bash
           set -e
@@ -495,7 +499,7 @@ jobs:
       - name: Update branch-status.yaml
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.BRANCH_MANAGE_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
             const yaml = require('js-yaml');
@@ -520,7 +524,7 @@ jobs:
 
       - name: Commit and push changes
         env:
-          GITHUB_TOKEN: ${{ secrets.BRANCH_MANAGE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           BRANCH="${{ matrix.branch }}"
 
@@ -528,7 +532,7 @@ jobs:
           git commit -m "Update branch-status.yaml for $BRANCH"
           git push origin "$BRANCH"
 
-  unprotect_main_branch:
+  delete_lock:
     runs-on: [ self-hosted, Linux ]
     needs: yield_new_branches
     if: >-
@@ -536,14 +540,22 @@ jobs:
         always()
       }}
     steps:
-      - name: Remove branch protection from main
-        uses: actions/github-script@v6
+      - uses: actions/checkout@v4
         with:
-          github-token: ${{ secrets.BRANCH_MANAGE_TOKEN }}
-          script: |
-            await github.rest.repos.deleteBranchProtection({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              branch: 'main'
-            });
+          ref: main
+          fetch-depth: 0
 
+      - name: Delete .lock file
+        run: |
+          rm -f .lock
+
+      - name: Commit and push .lock file deletion
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+          git add .lock
+          git commit -m "Unlock the repository after automatic branch management" || echo "No changes to commit"
+          git push origin main
