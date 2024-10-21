@@ -32,3 +32,4 @@ scene3:
     - '2024-10-21T22:00:00.000Z'
   branch_name: scene3/fix-20
   timestamp: '2024-10-21T16:30:40.042Z'
+  merged: true
