@@ -15,9 +15,6 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Set up GitHub CLI
-        uses: actions/setup-gh@v3
-
       - name: Trigger Target Workflow
         id: trigger_workflow
         run: |
