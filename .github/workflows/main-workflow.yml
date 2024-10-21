@@ -10,7 +10,7 @@ on:
 
 jobs:
   trigger-target-workflow:
-    runs-on: [ self-hosted, Linux ]
+    runs-on: [self-hosted, Linux]
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -20,32 +20,19 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh workflow list -a
-          gh workflow run target-workflow.yml --ref main
+          # ターゲットワークフローをトリガー（inputとしてmainのinputを渡す）
+          gh workflow run target-workflow.yml --ref main --field example_input="${{ github.event.inputs.example_input }}"
           
           # トリガーされたワークフローのIDを取得
           TARGET_RUN_ID=$(gh run list --workflow=target-workflow.yml --branch=main --limit=1 --json databaseId -q '.[0].databaseId')
           echo "Triggered Workflow Run ID: $TARGET_RUN_ID"
-          echo "target_run_id=$TARGET_RUN_ID" >> $GITHUB_ENV
+          echo "TARGET_RUN_ID=$TARGET_RUN_ID" >> $GITHUB_ENV
 
-      - name: Wait for Target Workflow to Complete
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # ワークフローの実行を監視
+          gh run watch $TARGET_RUN_ID --exit-status
+
+      - name: Show Target Workflow Logs
+        if: success() # ターゲットワークフローが成功した場合
         run: |
-          TARGET_RUN_ID=${{ env.target_run_id }}
-          while : ; do
-            # APIを叩いてワークフローのステータスを取得
-            STATUS=$(gh run view $TARGET_RUN_ID --json status -q .status)
-            echo "Current Status: $STATUS"
-
-            if [[ "$STATUS" == "completed" ]]; then
-              echo "Target workflow completed"
-              break
-            elif [[ "$STATUS" == "failure" ]]; then
-              echo "Target workflow failed"
-              exit 1
-            fi
-
-            # 10秒待機して再度ステータスをチェック
-            sleep 10
-          done
+          # トリガーされたワークフローのログを表示
+          gh run view $TARGET_RUN_ID --log
