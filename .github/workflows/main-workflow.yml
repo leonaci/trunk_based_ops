@@ -21,8 +21,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # ターゲットワークフローをトリガー（inputとしてmainのinputを渡す）
-          workflow_run_id=$(gh workflow run target-workflow.yml --ref main --json id --jq .id)
+          gh workflow run target-workflow.yml --ref main --json id -q '.id' \
+            --field example_input="${{ github.event.inputs.example_input }}"
 
+          sleep 10
+
+          # トリガーされたワークフローのIDを取得
+          workflow_run_id=$(gh run list --workflow=target-workflow.yml --branch=main --limit=1 --json databaseId -q '.[0].databaseId')
           echo "Triggered Workflow Run ID: $workflow_run_id"
           echo "WORKFLOW_RUN_ID=$workflow_run_id" >> $GITHUB_ENV
 
