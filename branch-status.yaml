@@ -39,6 +39,7 @@ scene2/cut1:
     - '2024-10-21T23:00:00.000Z'
   branch_name: scene2/cut1/feature-27
   timestamp: '2024-10-21T09:34:55.975Z'
+  merged: true
 scene3:
   type: fix
   schedules:
