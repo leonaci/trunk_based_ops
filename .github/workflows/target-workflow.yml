@@ -1,0 +1,25 @@
+name: Target Workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      example_input:
+        description: 'An example input for the target workflow'
+        required: false
+        default: 'default target value'
+
+jobs:
+  perform-action:
+    runs-on: [ self-hosted, Linux ]
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Display Input
+        run: |
+          echo "Received input: ${{ github.event.inputs.example_input }}"
+
+      - name: Simulate Work
+        run: |
+          echo "Simulating some work..."
+          sleep 30  # 例として30秒待機
