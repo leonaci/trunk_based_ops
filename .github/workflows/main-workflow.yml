@@ -13,14 +13,36 @@ jobs:
     runs-on: [ self-hosted, Linux ]
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Trigger Target Workflow
-        id: trigger_workflow
+        id: trigger
         run: |
-          RUN_ID=$(gh workflow run target-workflow.yml --ref main --json id -q '.id')
-          echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
+          gh workflow run target-workflow.yml \
+            --ref main \
+            --field example_input="triggered from main workflow" > trigger_output.txt
+          
+          # トリガーされたワークフローのIDを取得
+          TARGET_RUN_ID=$(cat trigger_output.txt | grep -oP 'Workflow run created at \K\S+')
+          echo "Triggered Workflow Run ID: $TARGET_RUN_ID"
+          echo "target_run_id=$TARGET_RUN_ID" >> $GITHUB_ENV
 
-      - name: Wait for Target Workflow Completion
+      - name: Wait for Target Workflow to Complete
         run: |
-          gh run watch ${{ env.RUN_ID }}
+          TARGET_RUN_ID=${{ env.target_run_id }}
+          while : ; do
+            # APIを叩いてワークフローのステータスを取得
+            STATUS=$(gh run view $TARGET_RUN_ID --json status -q .status)
+            echo "Current Status: $STATUS"
+
+            if [[ "$STATUS" == "completed" ]]; then
+              echo "Target workflow completed"
+              break
+            elif [[ "$STATUS" == "failure" ]]; then
+              echo "Target workflow failed"
+              exit 1
+            fi
+
+            # 10秒待機して再度ステータスをチェック
+            sleep 10
+          done
