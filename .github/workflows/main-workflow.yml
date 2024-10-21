@@ -21,10 +21,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh workflow list -a
-          gh workflow run target-workflow.yml --ref main > trigger_output.txt
+          gh workflow run target-workflow.yml --ref main
           
           # トリガーされたワークフローのIDを取得
-          TARGET_RUN_ID=$(cat trigger_output.txt | grep -oP 'Workflow run created at \K\S+')
+          TARGET_RUN_ID=$(gh run list --workflow=target-workflow.yml --branch=main --limit=1 --json databaseId -q '.[0].databaseId')
           echo "Triggered Workflow Run ID: $TARGET_RUN_ID"
           echo "target_run_id=$TARGET_RUN_ID" >> $GITHUB_ENV
 
