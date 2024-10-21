@@ -17,6 +17,8 @@ jobs:
 
       - name: Trigger Target Workflow
         id: trigger
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh workflow run target-workflow.yml \
             --ref main \
@@ -28,6 +30,8 @@ jobs:
           echo "target_run_id=$TARGET_RUN_ID" >> $GITHUB_ENV
 
       - name: Wait for Target Workflow to Complete
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TARGET_RUN_ID=${{ env.target_run_id }}
           while : ; do
