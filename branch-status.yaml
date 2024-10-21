@@ -22,9 +22,8 @@ scene1:
     - '2024-10-21T21:00:00.000Z'
     - '2024-10-21T22:00:00.000Z'
     - '2024-10-21T23:00:00.000Z'
-  branch_name: scene1/mock-18
-  timestamp: '2024-10-21T03:00:00.300Z'
-  merged: true
+  branch_name: scene1/mock-19
+  timestamp: '2024-10-21T03:34:59.826Z'
 scene2/cut1:
   type: feature
   schedules:
@@ -49,9 +48,8 @@ scene2/cut1:
     - '2024-10-21T21:00:00.000Z'
     - '2024-10-21T22:00:00.000Z'
     - '2024-10-21T23:00:00.000Z'
-  branch_name: scene2/cut1/feature-20
-  timestamp: '2024-10-21T03:00:00.300Z'
-  merged: true
+  branch_name: scene2/cut1/feature-21
+  timestamp: '2024-10-21T03:34:59.826Z'
 scene3:
   type: fix
   schedules:
