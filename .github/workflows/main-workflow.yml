@@ -6,84 +6,24 @@ on:
       example_input:
         description: 'An example input for the main workflow'
         required: false
-        default: 'default value'
+        default: 'default main value'
 
 jobs:
-  trigger-and-wait:
+  trigger-target-workflow:
     runs-on: [ self-hosted, Linux ]
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Trigger Target Workflow via GitHub API
+      - name: Set up GitHub CLI
+        uses: actions/setup-gh@v3
+
+      - name: Trigger Target Workflow
         id: trigger_workflow
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OWNER: ${{ github.repository_owner }}
-          REPO: ${{ github.event.repository.name }}
-          WORKFLOW_FILE: target-workflow.yml  # 置き換えてください
-          REF: main  # ブランチ名
-          INPUT_EXAMPLE: ${{ github.event.inputs.example_input }}
         run: |
-          echo "Triggering the target workflow..."
+          RUN_ID=$(gh workflow run target-workflow.yml --ref main --json id -q '.id')
+          echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
 
-          RESPONSE=$(curl -s -X POST \
-            -H "Accept: application/vnd.github.v3+json" \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            https://api.github.com/repos/$OWNER/$REPO/actions/workflows/$WORKFLOW_FILE/dispatches \
-            -d "{\"ref\":\"$REF\", \"inputs\": {\"example_input\":\"$INPUT_EXAMPLE\"}}")
-
-          echo "Trigger response: $RESPONSE"
-
-          # GitHub APIでは、workflow_dispatchのレスポンスにRun IDが含まれないため、最新の実行を取得する必要があります。
-          # 簡易的な方法として、トリガー後すぐに最新の実行を取得します。
-
-          RUN_ID=$(curl -s -H "Accept: application/vnd.github.v3+json" \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            https://api.github.com/repos/$OWNER/$REPO/actions/workflows/$WORKFLOW_FILE/runs?branch=$REF&event=workflow_dispatch \
-            | jq '.workflow_runs[0].id')
-
-          echo "run_id::$RUN_ID" >> $GITHUB_OUTPUT
-
-      - name: Wait for Target Workflow to Complete
-        id: wait_workflow
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OWNER: ${{ github.repository_owner }}
-          REPO: ${{ github.event.repository.name }}
-          RUN_ID: ${{ steps.trigger_workflow.outputs.run_id }}
+      - name: Wait for Target Workflow Completion
         run: |
-          echo "Waiting for Target Workflow Run ID: $RUN_ID"
-
-          STATUS=""
-          CONCLUSION=""
-          MAX_RETRIES=60  # 最大待機時間：約10分（60回 × 10秒）
-          SLEEP_TIME=10
-
-          for ((i=1;i<=MAX_RETRIES;i++)); do
-            RESPONSE=$(curl -s -H "Accept: application/vnd.github.v3+json" \
-              -H "Authorization: token $GITHUB_TOKEN" \
-              https://api.github.com/repos/$OWNER/$REPO/actions/runs/$RUN_ID)
-
-            STATUS=$(echo "$RESPONSE" | jq -r '.status')
-            CONCLUSION=$(echo "$RESPONSE" | jq -r '.conclusion')
-
-            echo "Attempt $i: Status=$STATUS, Conclusion=$CONCLUSION"
-
-            if [[ "$STATUS" == "completed" ]]; then
-              echo "Target workflow has completed with conclusion: $CONCLUSION"
-              if [[ "$CONCLUSION" == "success" ]]; then
-                exit 0
-              else
-                exit 1
-              fi
-            fi
-
-            sleep $SLEEP_TIME
-          done
-
-          echo "Timed out waiting for Target Workflow to complete."
-          exit 1
-
-      - name: Confirm Completion
-        run: echo "Target workflow has successfully completed."
+          gh run watch ${{ env.RUN_ID }}
