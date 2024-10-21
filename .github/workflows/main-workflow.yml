@@ -33,6 +33,8 @@ jobs:
 
       - name: Show Target Workflow Logs
         if: success() # ターゲットワークフローが成功した場合
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # トリガーされたワークフローのログを表示
           gh run view $TARGET_RUN_ID --log
