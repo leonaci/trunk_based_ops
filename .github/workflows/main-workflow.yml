@@ -21,7 +21,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # ターゲットワークフローをトリガー（inputとしてmainのinputを渡す）
-          gh workflow run target-workflow.yml --ref main --json id -q '.id' \
+          gh workflow run target-workflow.yml --ref main \
             --field example_input="${{ github.event.inputs.example_input }}"
 
           sleep 10
