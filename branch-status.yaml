@@ -1,7 +1,6 @@
 scene1:
   type: mock
   schedules:
-    - '2024-10-21T03:00:00.000Z'
     - '2024-10-21T04:00:00.000Z'
     - '2024-10-21T05:00:00.000Z'
     - '2024-10-21T06:00:00.000Z'
@@ -22,13 +21,11 @@ scene1:
     - '2024-10-21T21:00:00.000Z'
     - '2024-10-21T22:00:00.000Z'
     - '2024-10-21T23:00:00.000Z'
-  branch_name: scene1/mock-19
-  timestamp: '2024-10-21T03:34:59.826Z'
-  merged: true
+  branch_name: scene1/mock-20
+  timestamp: '2024-10-21T04:29:47.782Z'
 scene2/cut1:
   type: feature
   schedules:
-    - '2024-10-21T03:00:00.000Z'
     - '2024-10-21T04:00:00.000Z'
     - '2024-10-21T05:00:00.000Z'
     - '2024-10-21T06:00:00.000Z'
@@ -49,9 +46,8 @@ scene2/cut1:
     - '2024-10-21T21:00:00.000Z'
     - '2024-10-21T22:00:00.000Z'
     - '2024-10-21T23:00:00.000Z'
-  branch_name: scene2/cut1/feature-21
-  timestamp: '2024-10-21T03:34:59.826Z'
-  merged: true
+  branch_name: scene2/cut1/feature-22
+  timestamp: '2024-10-21T04:29:47.782Z'
 scene3:
   type: fix
   schedules:
@@ -65,6 +61,5 @@ scene3:
     - '2024-10-21T18:00:00.000Z'
     - '2024-10-21T20:00:00.000Z'
     - '2024-10-21T22:00:00.000Z'
-  branch_name: scene3/fix-13
-  timestamp: '2024-10-21T03:00:00.300Z'
-  merged: true
+  branch_name: scene3/fix-14
+  timestamp: '2024-10-21T04:29:47.782Z'
